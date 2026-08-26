@@ -89,7 +89,7 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  max-width: 1320px;
+  max-width: 1500px;
   margin: 0 auto;
   width: 100%;
 }
@@ -252,6 +252,30 @@ button { letter-spacing: 0.02em; }
 .actions { flex-direction: row; flex-wrap: wrap; }
 .actions button { flex: 1; min-width: 100px; }
 
+/* 봇을 앉힌 자리 위에 겹쳐 뜨는 내보내기 버튼 */
+.seat { position: relative; }
+.seat__kick {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 24px; height: 24px;
+  flex: none;
+  display: grid; place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 15px; line-height: 1;
+}
+.seat__kick:hover:not(:disabled) { color: var(--warn); border-color: var(--warn); }
+/* 내보내기 버튼이 자리표 오른쪽 내용과 겹치지 않게 여백을 준다 */
+.seat:has(.seat__kick) button { padding-right: 42px; }
+
+.lobbytools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.lobbytools button { flex: 1; min-width: 110px; }
+
 .toast {
   position: fixed;
   left: 50%;
@@ -267,16 +291,147 @@ button { letter-spacing: 0.02em; }
 
 /* ─────────── 게임 화면 ─────────── */
 
-.game { display: flex; flex-direction: column; gap: 12px; }
+/* ═══════════ 스컬킹 몰입형 게임 화면 ═══════════ */
+/* 게임 중에는 앱 전체를 화면 꽉 채우게 (가운데 정렬·헤더·푸터 제거) */
+/* height 고정 + overflow hidden 으로 뷰포트를 넘지 않게 → 손패가 화면 밖으로 밀리지 않는다 */
+.app--immersive { max-width: none; height: 100dvh; overflow: hidden; }
+.app--immersive .topbar,
+.app--immersive .footer { display: none; }
+/* min-height:0 이 없으면 flex 아이템이 콘텐츠보다 못 줄어들어 뷰포트를 넘고,
+   그만큼 손패가 화면 밖(아래)으로 밀린다. 체인 전체에 걸어준다. */
+.app--immersive .main { padding: 0; gap: 0; min-height: 0; }
+
+.skgame {
+  flex: 1; min-height: 0; min-width: 0;
+  display: flex; align-items: stretch;
+  background:
+    radial-gradient(1100px 700px at 28% -5%, color-mix(in srgb, var(--accent) 12%, transparent), transparent),
+    var(--bg);
+}
+
+/* 좌측 레일 (플레이어 점수판) */
+.skrail {
+  /* 폭(flex-basis)은 React inline 으로 제어한다. 여기선 나머지만. */
+  flex-grow: 0; flex-shrink: 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 12px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  /* flex-basis 트랜지션은 이 브라우저에서 값이 시작점에 붙어버려 접기가 안 먹는다 → 애니메이션 없이 즉시 전환 */
+}
+.skgame--railclosed .skrail__meta,
+.skgame--railclosed .railseats,
+.skgame--railclosed .skrail__abort { display: none; }
+
+.skrail__head { display: flex; align-items: center; gap: 10px; }
+.skrail__collapse {
+  width: 36px; height: 36px; flex: none;
+  display: grid; place-items: center; padding: 0;
+  border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+  font-size: 20px; line-height: 1;
+}
+.skrail__collapse:hover { border-color: var(--accent); }
+.skrail__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.skrail__round { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.skrail__round b { font-family: var(--font-display); font-size: 20px; color: var(--text); margin: 0 2px; }
+.skrail__round em { font-style: normal; color: var(--muted); font-size: 13px; }
+.skrail__cards { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.railseats { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.railseat {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: var(--r);
+  background: var(--surface-2); border: 1px solid var(--line);
+  transition: border-color 0.15s, background 0.15s;
+}
+.railseat.is-me { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.railseat.is-turn {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 28%, var(--surface-2)), var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.railseat--ghost { border-style: dashed; opacity: 0.72; }
+.railseat__body { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.railseat__namerow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.railseat__name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.railseat__bw { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+.railseat__bw b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 800; }
+.railseat__bw.is-ok b { color: var(--ok); }
+.railseat__score {
+  font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--text);
+  flex: none; font-variant-numeric: tabular-nums;
+}
+.skrail__abort { margin-top: auto; width: 100%; }
+
+/* 우측 스테이지 — 상태(위) · 진행(가운데, 남는 공간) · 손패(맨 아래 고정) */
+.skstage {
+  flex: 1; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 16px 28px 20px;
+  overflow: hidden;
+}
+/* 손패는 카드가 있든 없든 같은 높이 → 단계가 바뀌어도 위아래로 안 흔들린다 */
+.skstage > .hand { flex: none; }
+.skstage .handrow { min-height: 275px; }
+/* 가운데(입찰/테이블/결과)는 남는 공간을 전부 차지하고, 그 아래 손패는 항상 화면 맨 아래 고정.
+   → 단계가 바뀌어(테이블 카드가 생겼다 없어졌다) 손패가 위아래로 흔들리지 않는다. */
+.skstage__mid {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; justify-content: flex-start;
+  overflow-y: auto;
+}
+/* 스테이지 가운데(입찰/테이블/결과)는 박스 껍데기를 벗겨 캔버스에 띄운다 */
+.skstage__mid > .panel { background: transparent; border-color: transparent; padding: 0; }
+/* 손패 트레이 — 세로 여백을 최소화 */
+.skstage > .hand { padding: 10px 18px 12px; }
+
+/* 큰 중앙 상태 */
+.skstatus { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.skstatus__title { font-size: 30px; font-weight: 800; letter-spacing: 0.02em; line-height: 1.1; }
+.skstatus--me .skstatus__title { color: #fff; text-shadow: 0 0 26px color-mix(in srgb, var(--accent) 60%, transparent); }
+.skstatus--wait .skstatus__title { color: var(--muted); }
+.skstatus__sub { font-size: 14px; color: var(--muted); }
+
+/* 큰 카운트다운 — 숫자 양옆으로 진행바 */
+.bigcount { display: flex; align-items: center; gap: 16px; width: min(560px, 92%); }
+.bigcount__bar { flex: 1; height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.bigcount__bar--l { transform: scaleX(-1); }
+.bigcount__fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.2s linear; }
+.bigcount__num {
+  font-family: var(--font-display); font-size: 42px; line-height: 1; min-width: 60px; text-align: center;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.bigcount--urgent .bigcount__fill { background: var(--warn); }
+.bigcount--urgent .bigcount__num { color: var(--warn); }
+
+/* 좁은 화면: 레일을 위쪽 가로 바로 */
+@media (max-width: 760px) {
+  .skgame { flex-direction: column; }
+  .skrail {
+    width: auto; flex-direction: row; align-items: center; gap: 8px;
+    overflow-x: auto; overflow-y: hidden;
+    border-right: none; border-bottom: 1px solid var(--line);
+  }
+  .skgame--railclosed .skrail { width: auto; }
+  .skrail__head { flex: none; }
+  .railseats { flex-direction: row; margin-top: 0; }
+  .railseat { flex: 0 0 auto; }
+  .skrail__abort { margin-top: 0; width: auto; flex: none; }
+  .skstage { padding: 14px; }
+  .skstatus__title { font-size: 24px; }
+  .bigcount__num { font-size: 34px; }
+}
 
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .panel--quiet { background: transparent; border-style: dashed; }
 .panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -309,33 +464,39 @@ button { letter-spacing: 0.02em; }
 .bigstat--ok b { color: var(--ok); }
 .bigstat__sep { font-size: 20px; color: var(--muted); padding-bottom: 2px; }
 
-/* 내 차례 배너 */
+/* 내 차례 배너 — 크고 직관적으로 */
 .turnbanner {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  border-radius: var(--r-lg); padding: 13px 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  border-radius: var(--r-lg); padding: 20px 24px;
   border: 1px solid var(--line); background: var(--surface);
 }
-.turnbanner__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.turnbanner__text strong { font-size: 16px; font-weight: 700; letter-spacing: 0.01em; }
-.turnbanner__text span { font-size: 12px; color: var(--muted); }
+.turnbanner__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.turnbanner__text strong { font-size: 24px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1; }
+.turnbanner__text span { font-size: 14px; color: var(--muted); }
 .turnbanner--me {
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: linear-gradient(97deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--surface));
-  box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: linear-gradient(97deg, color-mix(in srgb, var(--accent) 34%, transparent), var(--surface));
+  box-shadow: 0 0 34px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation: turnpulse 1.8s ease-in-out infinite;
 }
-.turnbanner--me .turnbanner__text strong { color: #fff; }
-.turnbanner--wait { opacity: 0.85; }
+.turnbanner--me .turnbanner__text strong { color: #fff; font-size: 27px; }
+.turnbanner--wait { opacity: 0.82; }
+@keyframes turnpulse {
+  0%, 100% { box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent); }
+  50%      { box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 42%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .turnbanner--me { animation: none; } }
 
 /* 카운트다운 */
-.countdown { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; width: 130px; }
-.countdown__bar { width: 100%; height: 5px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+.countdown { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; width: 170px; }
+.countdown__bar { width: 100%; height: 7px; background: var(--bg); border-radius: 999px; overflow: hidden; }
 .countdown__fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.2s linear; }
-.countdown__text { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.countdown__text { font-size: 20px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
 .countdown--urgent .countdown__fill { background: var(--warn); }
 .countdown--urgent .countdown__text { color: var(--warn); font-weight: 700; }
 
-/* 플레이어 현황 */
-.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
+/* 플레이어 현황 — 좌측 사이드바에 세로로 쌓인다 */
+.board { display: flex; flex-direction: column; gap: 8px; }
 .seatcard {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r); padding: 10px 12px;
@@ -388,9 +549,9 @@ button { letter-spacing: 0.02em; }
   background: linear-gradient(160deg, #f4f1e8, #d8d3c4);
   box-shadow: 0 3px 8px var(--shadow);
 }
-.pcard--lg { width: 82px; height: 115px; }
-.pcard--md { width: 66px; height: 92px; }
-.pcard--sm { width: 52px; height: 73px; }
+.pcard--lg { width: 172px; height: 241px; }
+.pcard--md { width: 112px; height: 157px; }
+.pcard--sm { width: 62px; height: 87px; }
 
 /* 안쪽 색 패널 */
 .pcard::before {
@@ -408,7 +569,6 @@ button { letter-spacing: 0.02em; }
 .pcard--black  { --pcard-bg: linear-gradient(165deg, #34343d, #14141a); --pcard-art: #e6e8ef; --pcard-ink: #ffffff; }
 /* 특수카드는 종류별로 색이 다르다 — 손패에서 한눈에 구분되도록 */
 .pcard--escape    { --pcard-bg: linear-gradient(165deg, #5a626e, #2f343c); --pcard-art: #e8ecf4; --pcard-ink: #f4f6fa; }
-.pcard--loot      { --pcard-bg: linear-gradient(165deg, #2f7d6e, #17443c); --pcard-art: #9df0dc; --pcard-ink: #eafff9; }
 .pcard--pirate    { --pcard-bg: linear-gradient(165deg, #a83232, #5c1618); --pcard-art: #ffc9c0; --pcard-ink: #fff0ee; }
 .pcard--tigress   { --pcard-bg: linear-gradient(165deg, #c2701c, #6b3a0a); --pcard-art: #ffd9a3; --pcard-ink: #fff4e5; }
 .pcard--mermaid   { --pcard-bg: linear-gradient(165deg, #1f7f9c, #0e3f53); --pcard-art: #a8ecff; --pcard-ink: #eafaff; }
@@ -424,41 +584,54 @@ button { letter-spacing: 0.02em; }
   padding-bottom: 16%;
 }
 .pcard__svg { width: 62%; height: 62%; color: var(--pcard-art); }
-/* 그림 파일이 있을 때는 카드 전체를 채운다 */
-.pcard.has-image .pcard__art { padding-bottom: 0; }
+/* 그림 파일(완성 카드)일 때는 크림색 테두리·색 패널을 걷어내고 그림이 카드 전체를 꽉 채운다 */
+.pcard.has-image { padding: 0; background: none; }
+.pcard.has-image::before { display: none; }
+.pcard.has-image .pcard__art { inset: 0; padding-bottom: 0; }
 .pcard__img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-sm); }
+.pcard.has-image .pcard__img { border-radius: var(--r); }
 .pcard--lg .pcard__svg { width: 60%; height: 60%; }
 
 .pcard__rank {
   position: absolute;
-  top: 7px; left: 8px;
-  font-size: 20px; font-weight: 800; line-height: 1;
+  top: 8px; left: 10px;
+  font-size: 26px; font-weight: 800; line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--pcard-ink);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
-.pcard--lg .pcard__rank { font-size: 24px; }
-.pcard--sm .pcard__rank { font-size: 16px; }
+.pcard--lg .pcard__rank { font-size: 34px; }
+.pcard--sm .pcard__rank { font-size: 18px; }
 
 .pcard__suitname,
 .pcard__title {
   position: absolute; left: 4px; right: 4px; bottom: 4px;
   padding: 4px 3px 5px;
   border-radius: 0 0 8px 8px;
-  font-size: 9px; font-weight: 700; letter-spacing: -0.01em; text-align: center;
+  font-size: 11px; font-weight: 700; letter-spacing: -0.01em; text-align: center;
   color: var(--pcard-ink);
   background: rgba(0, 0, 0, 0.42);
 }
-.pcard--lg .pcard__suitname, .pcard--lg .pcard__title { font-size: 11px; }
-.pcard--sm .pcard__suitname, .pcard--sm .pcard__title { font-size: 8px; }
+.pcard--lg .pcard__suitname, .pcard--lg .pcard__title { font-size: 13px; }
+.pcard--sm .pcard__suitname, .pcard--sm .pcard__title { font-size: 9px; }
 
+/* 티그리스 선언 — 테이블에서 해적/도주가 항상 또렷하게 보이도록 */
 .pcard__declared {
-  position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
-  font-size: 9px; font-weight: 700;
-  background: var(--accent); color: #fff;
-  padding: 2px 8px; border-radius: 999px;
-  white-space: nowrap;
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; font-weight: 900; letter-spacing: 0.02em;
+  color: #fff; padding: 3px 12px; border-radius: 999px;
+  white-space: nowrap; z-index: 3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
+.pcard__declared--pirate { background: #c0392b; }   /* 해적 = 붉은색 */
+.pcard__declared--escape { background: #4b515c; }   /* 도주 = 회색 */
+/* 카드 테두리도 선언 색으로 링을 둘러 한눈에 구분 */
+.pcard:has(.pcard__declared--pirate) { box-shadow: 0 0 0 3px #c0392b, 0 3px 8px var(--shadow); }
+.pcard:has(.pcard__declared--escape) { box-shadow: 0 0 0 3px #4b515c, 0 3px 8px var(--shadow); }
+/* 도주는 '진다'는 걸 알 수 있게 살짝 어둡게 */
+.pcard:has(.pcard__declared--escape) .pcard__img,
+.pcard:has(.pcard__declared--escape) .pcard__svg { filter: brightness(0.72) saturate(0.9); }
 
 .pcard.is-clickable { cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
 .pcard.is-clickable:hover:not(:disabled) {
@@ -469,9 +642,13 @@ button { letter-spacing: 0.02em; }
 .pcard.is-dim { opacity: 0.3; filter: grayscale(0.6); cursor: not-allowed; }
 
 /* 테이블에 깔린 카드 */
-.tablerow { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
-.played { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.played__name { font-size: 12px; color: var(--muted); max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tablerow {
+  display: flex; flex-wrap: wrap; gap: 18px;
+  align-items: flex-end; justify-content: flex-start;
+  min-height: 250px; padding: 14px 4px;
+}
+.played { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.played__name { font-size: 13px; color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .played.is-won .pcard { box-shadow: 0 0 0 3px var(--ok), 0 0 20px color-mix(in srgb, var(--ok) 50%, transparent); }
 .played.is-won .played__name { color: var(--ok); font-weight: 700; }
 
@@ -535,13 +712,19 @@ button { letter-spacing: 0.02em; }
   display: flex; flex-direction: column; gap: 12px;
 }
 .modal__box h2 { margin: 0; font-size: 16px; }
+.tigress__timer {
+  font-family: var(--font-mono, monospace); font-weight: 800; font-size: 15px;
+  color: var(--warn); float: right; font-variant-numeric: tabular-nums;
+}
 .modal__actions { display: flex; flex-direction: column; gap: 8px; }
 
 @media (max-width: 560px) {
   .main { padding: 12px; }
-  .pcard--lg { width: 82px; height: 116px; }
-  .pcard--md { width: 66px; height: 93px; }
+  .pcard--lg { width: 96px; height: 134px; }
+  .pcard--md { width: 74px; height: 104px; }
   .board { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
+  .tablerow { min-height: 156px; gap: 12px; }
+  .hand .handrow:has(.pcard) { min-height: 168px; }
   .tally__won { font-size: 26px; }
   .countdown { width: 104px; }
   .turnbanner__text strong { font-size: 15px; }
@@ -580,11 +763,9 @@ button { letter-spacing: 0.02em; }
   background: var(--surface); border: none;
   border-left: 3px solid var(--line);
   border-radius: var(--r); padding: 10px 16px;
+  /* 카드가 있든 없든 **항상 같은 높이**로 고정 — 상대가 카드를 내도 화면이 위아래로 안 흔들린다 */
   min-height: 121px;
-  transition: min-height 0.15s;
 }
-/* 아직 아무도 안 낸 단계(교환·선언)에서는 줄을 낮춰 화면을 아끼다 */
-.seatrow:not(:has(.seatrow__cards)) { min-height: 58px; }
 .seatrow--team0 { border-left-color: var(--team0); }
 .seatrow--team1 { border-left-color: var(--team1); }
 .seatrow.is-me { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
@@ -618,6 +799,49 @@ button { letter-spacing: 0.02em; }
   font-size: 13px;
 }
 
+/* 마작 소원 — 이뤄지기 전까지 화면 상단에 항상 떠 있는 배지 (모두에게 보인다) */
+.wishpin {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  z-index: 55;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px; border-radius: 999px;
+  background: linear-gradient(100deg, #c79a2e, #8a6508);
+  color: #fff;
+  border: 1px solid color-mix(in srgb, #ffe07a 60%, transparent);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), 0 0 0 3px color-mix(in srgb, #ffd700 22%, transparent);
+  animation: wishpulse 1.5s ease-in-out infinite;
+  max-width: calc(100vw - 24px); white-space: nowrap;
+}
+.wishpin__icon { font-size: 18px; line-height: 1; }
+.wishpin__label { font-size: 12px; opacity: 0.92; }
+.wishpin__rank {
+  font-family: var(--font-mono); font-size: 20px; font-weight: 900; line-height: 1;
+  background: rgba(255, 255, 255, 0.22); border-radius: 8px; padding: 2px 10px;
+}
+.wishpin__hint { font-size: 11px; opacity: 0.85; }
+@keyframes wishpulse {
+  0%, 100% { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), 0 0 0 3px color-mix(in srgb, #ffd700 18%, transparent); }
+  50%      { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), 0 0 0 7px color-mix(in srgb, #ffd700 34%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .wishpin { animation: none; } }
+@media (max-width: 560px) {
+  .wishpin { top: 52px; gap: 7px; padding: 6px 12px; }
+  .wishpin__hint { display: none; }
+}
+/* 폭탄 창구 안내 — 눈에 띄게 붉은 톤 + 살짝 펄스 */
+.bombbar {
+  margin: 0; padding: 9px 14px; border-radius: var(--r);
+  background: color-mix(in srgb, #c0392b 20%, var(--surface));
+  border: 1px solid color-mix(in srgb, #c0392b 55%, var(--line));
+  color: var(--text); font-size: 13px;
+  animation: bombpulse 1s ease-in-out infinite;
+}
+@keyframes bombpulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, #c0392b 40%, transparent); }
+  50%      { box-shadow: 0 0 16px 0 color-mix(in srgb, #c0392b 45%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .bombbar { animation: none; } }
+
 /* 티츄 카드 */
 .tcard {
   position: relative; flex: none; display: block;
@@ -629,6 +853,10 @@ button { letter-spacing: 0.02em; }
 .tcard--lg { width: 70px; height: 107px; }
 .tcard--md { width: 66px; height: 101px; }
 .tcard--sm { width: 42px; height: 64px; }
+/* 손패(내 카드)만 크게 — 무슨 카드 들었는지 잘 보이게. 그랜드티츄·카드교환·플레이 손패 공통.
+   데스크톱에서 14장이 스크롤 없이 들어가는 최대 크기(≈86px). 좁으면 자동 축소 + 가로 스크롤. */
+.handrow .tcard--lg { width: 86px; height: 132px; }
+@media (max-width: 900px) { .handrow .tcard--lg { width: 64px; height: 98px; } }
 .tcard__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tcard__text {
   display: grid; place-items: center; width: 100%; height: 100%;
@@ -649,7 +877,23 @@ button { letter-spacing: 0.02em; }
 
 /* 손패는 겹치지 않고 일자로. 14장이 한 줄에 다 들어가도록 폭을 잡았다.
    좁은 화면에서는 가로 스크롤로 넘어간다. */
-.hand .handrow { padding-top: 26px; padding-bottom: 12px; gap: 5px; }
+.hand .handrow { padding-top: 18px; padding-bottom: 8px; gap: 14px; }
+/* 스컬킹 손패(큰 카드): 카드에 딱 맞게 — 불필요한 세로 여백 최소화 */
+.hand .handrow:has(.pcard) { align-items: flex-end; }
+
+/* 손패 카드 한 장 + 색·숫자 라벨 묶음 */
+.handcard { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; }
+.handcard__tag {
+  font-size: 14px; font-weight: 800; letter-spacing: -0.01em; line-height: 1;
+  padding: 5px 12px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.handcard__tag--green   { color: #7fe3a3; border-color: color-mix(in srgb, #7fe3a3 40%, var(--line)); }
+.handcard__tag--yellow  { color: #f5cf62; border-color: color-mix(in srgb, #f5cf62 40%, var(--line)); }
+.handcard__tag--purple  { color: #c39bf0; border-color: color-mix(in srgb, #c39bf0 40%, var(--line)); }
+.handcard__tag--black   { color: #d7d9e0; border-color: color-mix(in srgb, #d7d9e0 30%, var(--line)); }
+.handcard__tag--special { color: var(--text); }
 
 .handactions { display: flex; align-items: center; gap: 8px; }
 .tichubtn {
@@ -878,3 +1122,48 @@ button { letter-spacing: 0.02em; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent),
               0 0 26px color-mix(in srgb, var(--accent) 18%, transparent);
 }
+
+/* ═══════════ 방 채팅 (같은 방만) ═══════════ */
+.chatfab {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent); border: none;
+  font-weight: 700; font-size: 14px; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.chatfab__badge {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center;
+  background: var(--warn); color: #fff; border-radius: 999px;
+  font-size: 11px; font-weight: 800;
+}
+.chat {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  width: 320px; max-width: calc(100vw - 32px);
+  height: 420px; max-height: calc(100dvh - 32px);
+  display: flex; flex-direction: column;
+  /* 불투명 배경 — 뒤 게임 UI가 비치지 않게 (채팅 가독성 우선) */
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6); overflow: hidden;
+}
+.chat__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+}
+.chat__title { font-weight: 700; font-size: 14px; }
+.chat__title small { color: var(--muted); font-weight: 500; font-size: 11px; margin-left: 6px; }
+.chat__close { background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 2px 6px; }
+.chat__list { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.chat__empty { color: var(--muted); font-size: 13px; text-align: center; margin: auto 0; }
+.chatmsg { display: flex; flex-direction: column; gap: 2px; max-width: 85%; align-self: flex-start; }
+.chatmsg--me { align-self: flex-end; align-items: flex-end; }
+.chatmsg__who { font-size: 11px; color: var(--muted); }
+.chatmsg__text {
+  background: var(--surface-2); padding: 7px 11px; border-radius: 12px;
+  font-size: 13px; word-break: break-word; white-space: pre-wrap;
+}
+.chatmsg--me .chatmsg__text { background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); color: var(--text); }
+.chat__input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.chat__input input { flex: 1; min-width: 0; }
+.chat__input button { flex: none; }

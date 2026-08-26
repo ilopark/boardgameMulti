@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TURN_POLICY, type RoomPublic, type skullking } from '@bg/core'
 import { request } from '../socket.js'
 import Card from './Card.js'
@@ -29,6 +29,7 @@ interface Props {
 export default function GameView({ room, view, remainingMs, waitingFor, seq, isHost, onError }: Props) {
   const [busy, setBusy] = useState(false)
   const [tigressPick, setTigressPick] = useState<SkCard | null>(null)
+  const [railOpen, setRailOpen] = useState(true)
 
   useEffect(() => {
     setTigressPick(null)
@@ -75,40 +76,71 @@ export default function GameView({ room, view, remainingMs, waitingFor, seq, isH
           : TURN_POLICY.roundEndMs
 
   return (
-    <div className="game">
-      <TopBar view={view} />
+    <div className={railOpen ? 'skgame' : 'skgame skgame--railclosed'}>
+      {/* 좌측 레일: 플레이어 점수판 (접기 가능) — 폭은 inline 으로 확실히 제어 */}
+      <aside
+        className="skrail"
+        style={railOpen ? { flexBasis: 300 } : { flexBasis: 54, padding: '14px 8px', overflow: 'hidden' }}
+      >
+        <div className="skrail__head">
+          <button
+            type="button"
+            className="skrail__collapse"
+            onClick={() => setRailOpen((v) => !v)}
+            title={railOpen ? '점수판 접기' : '점수판 펼치기'}
+            aria-label={railOpen ? '점수판 접기' : '점수판 펼치기'}
+          >
+            {railOpen ? '‹' : '›'}
+          </button>
+          <div className="skrail__meta">
+            <span className="skrail__round">
+              라운드 <b>{view.round}</b>
+              <em>/{view.totalRounds}</em>
+            </span>
+            <span className="skrail__cards">{view.cardCount}장</span>
+          </div>
+        </div>
 
-      <TurnBanner
-        view={view}
-        myTurn={myTurn}
-        myBidPending={myBidPending}
-        waitingFor={waitingFor}
-        nameOf={nameOf}
-        remainingMs={remainingMs}
-        totalMs={totalMs}
-        seq={seq}
-      />
+        <PlayerRail room={room} view={view} nameOf={nameOf} waitingFor={waitingFor} />
 
-      <PlayerBoard room={room} view={view} nameOf={nameOf} waitingFor={waitingFor} />
+        {isHost && (
+          <button
+            type="button"
+            className="ghost skrail__abort"
+            disabled={busy}
+            onClick={() => void run(() => request('game:abort', {}))}
+          >
+            게임 끝내고 대기실로
+          </button>
+        )}
+      </aside>
 
-      {view.phase === 'bidding' && <Bidding view={view} busy={busy} run={run} />}
-
-      {(view.phase === 'playing' || view.phase === 'trickEnd') && (
-        <TrickArea view={view} nameOf={nameOf} />
-      )}
-
-      {view.phase === 'roundEnd' && <RoundResult view={view} nameOf={nameOf} />}
-      {view.phase === 'gameEnd' && <GameEnd view={view} nameOf={nameOf} />}
-
-      {view.phase !== 'gameEnd' && (
-        <Hand
+      {/* 우측 스테이지: 상태 → 낸 카드 → 내 손패 */}
+      <section className="skstage">
+        <Status
           view={view}
           myTurn={myTurn}
-          legal={legal}
-          busy={busy}
-          onPlay={playCard}
+          myBidPending={myBidPending}
+          waitingFor={waitingFor}
+          nameOf={nameOf}
+          remainingMs={remainingMs}
+          totalMs={totalMs}
+          seq={seq}
         />
-      )}
+
+        <div className="skstage__mid">
+          {view.phase === 'bidding' && <Bidding view={view} busy={busy} run={run} />}
+          {(view.phase === 'playing' || view.phase === 'trickEnd') && (
+            <TrickArea view={view} nameOf={nameOf} />
+          )}
+          {view.phase === 'roundEnd' && <RoundResult view={view} nameOf={nameOf} />}
+          {view.phase === 'gameEnd' && <GameEnd view={view} nameOf={nameOf} />}
+        </div>
+
+        {view.phase !== 'gameEnd' && (
+          <Hand view={view} myTurn={myTurn} legal={legal} busy={busy} onPlay={playCard} />
+        )}
+      </section>
 
       {tigressPick && (
         <TigressModal
@@ -121,50 +153,12 @@ export default function GameView({ room, view, remainingMs, waitingFor, seq, isH
           onCancel={() => setTigressPick(null)}
         />
       )}
-
-      {isHost && (
-        <section className="panel panel--quiet">
-          <button
-            type="button"
-            className="ghost"
-            disabled={busy}
-            onClick={() => void run(() => request('game:abort', {}))}
-          >
-            게임 끝내고 대기실로
-          </button>
-        </section>
-      )}
     </div>
   )
 }
 
-function TopBar({ view }: { view: View }) {
-  const won = view.tricksWon[view.seat] ?? 0
-  return (
-    <section className="topinfo">
-      <div className="topinfo__round">
-        <strong>라운드 {view.round}</strong>
-        <span>/{view.totalRounds}</span>
-        <em>{view.cardCount}장</em>
-      </div>
-      {view.myBid !== null && (
-        <div className="topinfo__mine">
-          <span className="bigstat">
-            <em>내 입찰</em>
-            <b>{view.myBid}</b>
-          </span>
-          <span className="bigstat__sep">/</span>
-          <span className={won === view.myBid ? 'bigstat bigstat--ok' : 'bigstat'}>
-            <em>획득</em>
-            <b>{won}</b>
-          </span>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function TurnBanner({
+/** 큰 중앙 상태 표시 — 지금 뭘 해야 하는지 한눈에 + 큰 카운트다운 */
+function Status({
   view,
   myTurn,
   myBidPending,
@@ -190,12 +184,12 @@ function TurnBanner({
   if (view.phase === 'bidding') {
     if (myBidPending) {
       tone = 'me'
-      title = '몇 트릭 먹을지 고르세요'
-      sub = '아래에서 숫자를 누르면 확정됩니다'
+      title = '입찰하세요'
+      sub = '몇 트릭 이길지 아래 숫자로 고르세요'
     } else {
       tone = 'wait'
-      title = '다른 사람 입찰을 기다리는 중'
-      sub = waitingFor.map(nameOf).join(', ')
+      title = '입찰 대기 중'
+      sub = `${waitingFor.map(nameOf).join(', ')} 기다리는 중…`
     }
   } else if (view.phase === 'playing') {
     if (myTurn) {
@@ -218,17 +212,16 @@ function TurnBanner({
   }
 
   return (
-    <section className={`turnbanner turnbanner--${tone}`}>
-      <div className="turnbanner__text">
-        <strong>{title}</strong>
-        {sub && <span>{sub}</span>}
-      </div>
-      <Countdown remainingMs={remainingMs} totalMs={totalMs} seq={seq} />
-    </section>
+    <div className={`skstatus skstatus--${tone}`}>
+      <strong className="skstatus__title">{title}</strong>
+      {sub && <span className="skstatus__sub">{sub}</span>}
+      <Countdown big remainingMs={remainingMs} totalMs={totalMs} seq={seq} />
+    </div>
   )
 }
 
-function PlayerBoard({
+/** 좌측 레일에 세로로 쌓이는 플레이어 점수판 — B(입찰)/W(획득) + 점수 */
+function PlayerRail({
   room,
   view,
   nameOf,
@@ -246,7 +239,7 @@ function PlayerBoard({
   const waiting = new Set(waitingFor)
 
   return (
-    <section className="board">
+    <div className="railseats">
       {seats.map((seat) => {
         const isMe = seat === view.seat
         const isTurn = view.currentSeat === seat || (view.phase === 'bidding' && waiting.has(seat))
@@ -255,47 +248,43 @@ function PlayerBoard({
         const won = view.tricksWon[seat] ?? 0
         const met = bid !== null && won === bid
 
+        // 입찰 공개 전에는 남의 입찰을 숨긴다 (본인 것만 숫자로)
         const bidText = view.bidsRevealed ? (bid ?? '—') : placed ? (isMe ? bid : '✓') : '…'
 
         return (
           <div
             key={seat}
-            className={['seatcard', isMe ? 'is-me' : '', isTurn ? 'is-turn' : ''].filter(Boolean).join(' ')}
+            className={['railseat', isMe ? 'is-me' : '', isTurn ? 'is-turn' : ''].filter(Boolean).join(' ')}
           >
-            <div className="seatcard__head">
-              <span className="seatcard__name">{nameOf(seat)}</span>
-              <span className="seatcard__flags">
+            <div className="railseat__body">
+              <div className="railseat__namerow">
+                <span className="railseat__name">{nameOf(seat)}</span>
                 {view.dealer === seat && <em className="flagchip">딜러</em>}
                 {connected.get(seat) === false && <em className="flagchip flagchip--warn">끊김</em>}
-              </span>
+              </div>
+              <div className={met && view.bidsRevealed ? 'railseat__bw is-ok' : 'railseat__bw'}>
+                <span>B: <b>{bidText}</b></span>
+                <span>W: <b>{won}</b></span>
+              </div>
             </div>
-            <div className={met && view.bidsRevealed ? 'tally tally--ok' : 'tally'}>
-              <span className="tally__won">{won}</span>
-              <span className="tally__slash">/</span>
-              <span className="tally__bid">{bidText}</span>
-            </div>
-            <div className="seatcard__foot">
-              <span className="seatcard__label">획득 / 입찰</span>
-              <span className="seatcard__total">{view.totals[seat] ?? 0}점</span>
-            </div>
+            <span className="railseat__score">{view.totals[seat] ?? 0}</span>
           </div>
         )
       })}
       {view.hasGhost && (
-        <div className="seatcard seatcard--ghost">
-          <div className="seatcard__head">
-            <span className="seatcard__name">유령</span>
+        <div className="railseat railseat--ghost">
+          <div className="railseat__body">
+            <div className="railseat__namerow">
+              <span className="railseat__name">유령</span>
+            </div>
+            <div className="railseat__bw">
+              <span>남은 <b>{view.handCounts[GHOST_SEAT] ?? 0}</b></span>
+            </div>
           </div>
-          <div className="tally">
-            <span className="tally__won">{view.handCounts[GHOST_SEAT] ?? 0}</span>
-          </div>
-          <div className="seatcard__foot">
-            <span className="seatcard__label">남은 카드</span>
-            <span className="seatcard__total">점수 없음</span>
-          </div>
+          <span className="railseat__score">—</span>
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
@@ -360,12 +349,14 @@ function TrickArea({ view, nameOf }: { view: View; nameOf: (seat: number) => str
         <div className="tablerow">
           {showing.map((p, i) => {
             const won = outcome && outcome.winner === p.seat
+            const tag = cardTag(p.card, p.tigressAs)
             return (
               <div
                 key={`${p.seat}-${p.card.id}-${i}`}
                 className={won ? 'played is-won' : 'played'}
               >
-                <Card card={p.card} tigressAs={p.tigressAs} size="md" />
+                <Card card={p.card} tigressAs={p.tigressAs} size="lg" />
+                <span className={`handcard__tag handcard__tag--${tag.suit}`}>{tag.text}</span>
                 <span className="played__name">{nameOf(p.seat)}</span>
               </div>
             )
@@ -391,6 +382,28 @@ function TrickArea({ view, nameOf }: { view: View; nameOf: (seat: number) => str
   )
 }
 
+const SUIT_KO: Record<string, string> = { green: '초록', yellow: '노랑', purple: '보라', black: '검정' }
+const SPECIAL_KO: Record<string, string> = {
+  escape: '도주',
+  pirate: '해적',
+  mermaid: '인어',
+  skullking: '스컬킹',
+  tigress: '티그리스',
+  kraken: '크라켄',
+  whitewhale: '흰고래',
+}
+/**
+ * 카드 밑에 붙일 색+숫자 라벨 — 스컬킹은 색·숫자가 중요하므로 한눈에 보이게.
+ * 티그리스는 낼 때 해적/도주 중 뭘로 선언했는지까지 보여준다(테이블에서 특히 중요).
+ */
+function cardTag(card: SkCard, tigressAs?: 'pirate' | 'escape'): { text: string; suit: string } {
+  if (card.kind === 'number') return { text: `${SUIT_KO[card.color]} ${card.rank}`, suit: card.color }
+  if (card.kind === 'tigress' && tigressAs) {
+    return { text: `티그리스 · ${tigressAs === 'pirate' ? '해적' : '도주'}`, suit: 'special' }
+  }
+  return { text: SPECIAL_KO[card.kind] ?? '', suit: 'special' }
+}
+
 function Hand({
   view,
   myTurn,
@@ -404,29 +417,37 @@ function Hand({
   busy: boolean
   onPlay: (card: SkCard) => void
 }) {
-  const blocked = view.phase === 'playing' && myTurn && legal.size < view.hand.length
+  // 낼 카드를 고르는 건 '내 차례의 playing' 단계뿐이다.
+  // 입찰(bidding) 등 다른 단계에서는 손패를 흐리게 하지 않고 그대로 잘 보이게 둔다.
+  const inPlay = view.phase === 'playing' && myTurn
+  const blocked = inPlay && legal.size < view.hand.length
 
   return (
-    <section className={myTurn && view.phase === 'playing' ? 'panel hand hand--active' : 'panel hand'}>
+    <section className={inPlay ? 'panel hand hand--active' : 'panel hand'}>
       <div className="panel__head">
         <h2>내 손패 <span className="muted">({view.hand.length}장)</span></h2>
-        {view.phase === 'playing' && myTurn && <span className="nowtag">지금 낼 차례</span>}
+        {inPlay && <span className="nowtag">지금 낼 차례</span>}
       </div>
       {view.hand.length === 0 ? (
         <p className="muted">손패를 다 냈습니다.</p>
       ) : (
         <div className="handrow">
           {view.hand.map((c) => {
-            const playable = myTurn && view.phase === 'playing' && legal.has(c.id)
+            const playable = inPlay && legal.has(c.id)
+            // playing 단계에서 '낼 수 없는' 카드만 흐리게. 그 외 단계에서는 흐리게 하지 않는다.
+            const dim = inPlay && !legal.has(c.id)
+            const tag = cardTag(c)
             return (
-              <Card
-                key={c.id}
-                card={c}
-                size="lg"
-                playable={playable}
-                disabled={!playable || busy}
-                onClick={playable ? () => onPlay(c) : undefined}
-              />
+              <div className="handcard" key={c.id}>
+                <Card
+                  card={c}
+                  size="lg"
+                  playable={playable}
+                  disabled={dim}
+                  onClick={playable && !busy ? () => onPlay(c) : undefined}
+                />
+                <span className={`handcard__tag handcard__tag--${tag.suit}`}>{tag.text}</span>
+              </div>
             )
           })}
         </div>
@@ -435,6 +456,8 @@ function Hand({
     </section>
   )
 }
+
+const TIGRESS_DECIDE_MS = 10_000
 
 function TigressModal({
   busy,
@@ -445,11 +468,34 @@ function TigressModal({
   onPick: (as: 'pirate' | 'escape') => void
   onCancel: () => void
 }) {
+  const [left, setLeft] = useState(Math.ceil(TIGRESS_DECIDE_MS / 1000))
+  // onPick은 렌더마다 새로 만들어지므로 ref로 최신 값만 참조 (타이머가 리셋되지 않게)
+  const onPickRef = useRef(onPick)
+  onPickRef.current = onPick
+
+  // 10초 안에 안 고르면 자동으로 도주로 낸다
+  useEffect(() => {
+    const deadline = Date.now() + TIGRESS_DECIDE_MS
+    const id = setInterval(() => {
+      const s = Math.ceil((deadline - Date.now()) / 1000)
+      setLeft(Math.max(0, s))
+      if (deadline - Date.now() <= 0) {
+        clearInterval(id)
+        onPickRef.current('escape')
+      }
+    }, 200)
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <div className="modal" role="dialog">
       <div className="modal__box">
-        <h2>티그리스를 어떻게 낼까요?</h2>
-        <p className="muted">낼 때 반드시 선언해야 하고, 나중에 바꿀 수 없습니다.</p>
+        <h2>
+          티그리스를 어떻게 낼까요? <span className="tigress__timer">{left}초</span>
+        </h2>
+        <p className="muted">
+          낼 때 반드시 선언해야 하고, 나중에 바꿀 수 없습니다. <strong>10초 안에 안 고르면 도주로 냅니다.</strong>
+        </p>
         <div className="modal__actions">
           <button type="button" className="primary" disabled={busy} onClick={() => onPick('pirate')}>
             해적으로 (인어·숫자를 이김)

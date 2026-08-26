@@ -13,13 +13,15 @@ interface Props {
   totalMs: number
   label?: string
   urgentUnder?: number
+  /** 큰 중앙 카운트다운 (숫자 크게 + 양옆 진행바) */
+  big?: boolean
 }
 
 /**
  * 남은 시간 카운트다운.
  * 서버는 "남은 ms"만 보내고 시각 계산은 여기서 한다 — 클라이언트 시계가 어긋나도 안 틀어진다.
  */
-export default function Countdown({ remainingMs, totalMs, label, seq, urgentUnder = 10 }: Props) {
+export default function Countdown({ remainingMs, totalMs, label, seq, urgentUnder = 10, big = false }: Props) {
   const [left, setLeft] = useState(remainingMs ?? 0)
 
   useEffect(() => {
@@ -39,6 +41,21 @@ export default function Countdown({ remainingMs, totalMs, label, seq, urgentUnde
   const seconds = Math.ceil(left / 1000)
   const ratio = totalMs > 0 ? Math.min(1, left / totalMs) : 0
   const urgent = seconds <= urgentUnder
+
+  // 큰 중앙 카운트다운 — 양옆으로 뻗는 진행바 사이에 큰 숫자
+  if (big) {
+    return (
+      <div className={urgent ? 'bigcount bigcount--urgent' : 'bigcount'}>
+        <div className="bigcount__bar bigcount__bar--l">
+          <div className="bigcount__fill" style={{ width: `${ratio * 100}%` }} />
+        </div>
+        <span className="bigcount__num">{seconds}</span>
+        <div className="bigcount__bar bigcount__bar--r">
+          <div className="bigcount__fill" style={{ width: `${ratio * 100}%` }} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={urgent ? 'countdown countdown--urgent' : 'countdown'}>
