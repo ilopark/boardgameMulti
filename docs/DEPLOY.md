@@ -6,60 +6,77 @@
 GitHub Pages는 HTML/CSS/JS만 올려주는 **정적 호스팅**이라 서버 프로세스를 못 돌린다.
 같은 이유로 Vercel·Netlify도 안 된다 (서버리스 함수는 WebSocket을 유지 못 함).
 
-## 플랫폼 비교 (2026년 8월 기준)
+## 플랫폼 비교 (2026년 8월 확인)
 
-| 플랫폼 | 무료로 가능? | 걸리는 점 |
-|---|---|---|
-| GitHub Pages | ❌ | 정적 전용 |
-| Vercel / Netlify | ❌ | 서버리스 — WebSocket 불가 |
-| Render 무료 | ⚠️ **비추천** | **소켓이 5분마다 끊김**, 15분 무트래픽 시 슬립 + 콜드스타트 1분 |
-| Render 유료 | ✅ | $7/월, 슬립 없음 |
-| Fly.io | ❌ | 2024년 무료 티어 폐지, 카드 필수 |
-| Railway | ❌ | $5 크레딧 소진 후 유료 |
-| **Koyeb 무료** | ✅ **추천** | 카드 불필요, 512MB/0.1vCPU, 1시간 무트래픽 시 슬립(콜드스타트 1~5초) |
-| 자체 서버 + Cloudflare Tunnel | ✅ | 서버가 항상 켜져 있어야 함, 슬립·콜드스타트 없음 |
+| 플랫폼 | 무료 | 카드 | WebSocket | 비고 |
+|---|---|---|---|---|
+| GitHub Pages | ✅ | — | ❌ | 정적 전용, 서버가 없음 |
+| Vercel / Netlify | ✅ | — | ❌ | 서버리스라 소켓 유지 불가 |
+| Render 무료 | ✅ | 불필요 | ⚠️ | **소켓이 5분마다 끊김** — 못 씀 |
+| Render 유료 | $7/월 | 필요 | ✅ | 슬립 없음 |
+| **Koyeb** | ❌ | — | ✅ | **2026년 2월 Mistral 인수 후 신규 무료 가입 중단** |
+| Fly.io | ❌ | 필요 | ✅ | 2024년 무료 티어 폐지 |
+| Railway | ❌ | 필요 | ✅ | $5 크레딧 소진 후 유료 |
+| Northflank Sandbox | ✅ | **필요**(인증용) | ✅ | 항상 켜짐 |
+| **Cloudflare Tunnel** | ✅ | **불필요** | ✅ | 내 컴퓨터가 켜져 있어야 함 |
 
-> Render 무료는 소켓을 5분마다 끊어서 **게임 중에 튕긴다.** 쓰지 말 것.
+> Koyeb은 이 프로젝트 초기에 추천했다가 인수 이후 무료 티어가 닫힌 걸 확인하고 뺐다.
 
 ---
 
-## 추천 1: Koyeb (무료, GitHub 자동배포)
+## 추천 1: Cloudflare Tunnel — 가장 빠르고 계정도 필요 없다
 
-1. https://www.koyeb.com 가입 (GitHub 계정으로)
-2. **Create Service → GitHub** → `ilopark/boardgame` 선택
-3. 설정
-   - Branch: `main`
-   - Builder: **Dockerfile** (레포 루트의 Dockerfile을 자동 인식)
-   - Instance: **Free**
-   - Port: `3001` (HTTP)
-   - Health check path: `/health`
-4. 환경변수
-   ```
-   NODE_ENV=production
-   ```
-   (PORT는 Koyeb이 자동 주입. CORS_ORIGIN은 서버가 프론트까지 같이 주므로 불필요)
-5. Deploy
-
-이후 **main에 푸시하면 자동으로 재배포**된다. 별도 설정 없음.
-
-## 추천 2: 자체 서버 + Cloudflare Tunnel (무료, 슬립 없음)
-
-항상 켜 두는 리눅스 머신이 있으면 이게 가장 쾌적하다. 콜드스타트가 없다.
+친구들끼리 그때그때 모여서 하는 용도라면 이게 제일 낫다.
+회원가입도, 카드도, 도메인도 필요 없다. **실제로 WebSocket까지 동작 확인함.**
 
 ```bash
-# 서버에서
+brew install cloudflared    # 처음 한 번만
+npm run build               # 처음 한 번, 코드 바뀔 때마다
+npm run share
+```
+
+그러면 이런 게 뜬다:
+
+```
+==========================================================
+  친구들에게 이 링크를 보내세요
+
+  https://xxxx-yyyy-zzzz.trycloudflare.com
+
+  이 창을 닫으면 링크가 끊깁니다. 종료는 Ctrl+C
+==========================================================
+```
+
+**장점** — 콜드스타트 없음, 비용 0, 가입 절차 없음, 소켓이 안 끊김
+**단점** — 내 컴퓨터가 켜져 있어야 하고, 껐다 켜면 **주소가 바뀐다**
+
+주소를 고정하고 싶으면 Cloudflare 계정 + 도메인이 필요하다
+(무료 계정으로 가능하지만 도메인은 따로 있어야 함).
+
+## 추천 2: Northflank 무료 Sandbox — 항상 켜두고 싶을 때
+
+24시간 떠 있어야 하면 이쪽. 카드가 필요하지만 **인증 목적이고 Sandbox 자체는 무료**다.
+
+1. https://northflank.com 가입
+2. Create Service → **Build from Git** → `ilopark/boardgame`
+3. Build type: **Dockerfile** (레포 루트)
+4. Plan: **Sandbox (무료)**
+5. Port `3001`, HTTP, public
+6. Health check `/health`
+7. 환경변수 `NODE_ENV=production`
+
+## 그 외: 자체 서버에 상시 구동
+
+항상 켜 두는 리눅스 머신이 있으면:
+
+```bash
 git clone git@github.com:ilopark/boardgame.git
 cd boardgame
 docker build -t boardgame .
 docker run -d --restart=unless-stopped -p 3001:3001 \
   -e NODE_ENV=production --name boardgame boardgame
-
-# Cloudflare Tunnel (도메인 없이도 임시 주소 발급됨)
 cloudflared tunnel --url http://localhost:3001
 ```
-
-자동배포까지 원하면 서버에 [Watchtower](https://containrrr.dev/watchtower/)를 띄우거나,
-GitHub Actions에서 SSH로 `git pull && docker compose up -d --build` 하도록 하면 된다.
 
 ---
 
