@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+**/dist
+# tsc -b 증분 캐시. 이게 이미지에 들어가면 "이미 빌드됨"으로 판단해 dist를 안 만든다.
+# (Docker에서 *.tsbuildinfo는 루트만 매칭하므로 **/ 를 반드시 붙일 것)
+*.tsbuildinfo
+**/*.tsbuildinfo
+.git
+.github
+.claude
+*.md
+docs
+.DS_Store
+.env*

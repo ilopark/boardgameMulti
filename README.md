@@ -55,6 +55,17 @@ docs/RULES.md    구현 계약서. 코드와 다르면 문서가 맞다.
    (인어→스컬킹: 2018판 50점 / 2021판 40점). 상수를 코드에 박지 않는다.
 4. **룰 변경 순서는 문서 → 테스트 → 구현.** 반대로 하면 룰이 코드에 숨는다.
 
+## 배포
+
+GitHub Pages로는 안 된다 (실시간 서버가 필요). 배포 방법과 플랫폼 비교는
+[docs/DEPLOY.md](docs/DEPLOY.md) 참고.
+
+배포 형태 그대로 로컬에서 돌려보기:
+```bash
+docker build -t boardgame .
+docker run --rm -p 3001:3001 -e NODE_ENV=production boardgame
+```
+
 ## 다음 할 일
 
 [docs/ROADMAP.md](docs/ROADMAP.md)

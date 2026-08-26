@@ -1,7 +1,13 @@
 import { io, type Socket } from 'socket.io-client'
 import type { ClientToServer, Identity, ServerToClient } from '@bg/core'
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? `http://${location.hostname}:3001`
+/**
+ * 개발 중에는 vite(5173)와 서버(3001)가 따로 뜨므로 포트를 지정해야 한다.
+ * 배포하면 서버가 정적 파일까지 같이 주므로 **같은 오리진**을 쓴다 → CORS 문제가 없어진다.
+ */
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ??
+  (import.meta.env.DEV ? `http://${location.hostname}:3001` : location.origin)
 
 export type GameSocket = Socket<ServerToClient, ClientToServer>
 

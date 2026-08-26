@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 같은 브랜치에서 새 푸시가 오면 이전 실행은 취소한다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: 테스트 · 타입체크
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 룰 엔진 빌드
+        run: npm run build:core
+
+      - name: 테스트
+        run: npm test
+
+      - name: 타입체크 (server)
+        run: npx tsc --noEmit -p server
+
+      - name: 타입체크 (web)
+        run: npx tsc --noEmit -p web
+
+      - name: 프로덕션 빌드
+        run: npm run build
+
+  docker:
+    name: Docker 이미지 빌드
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 이미지 빌드
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: boardgame:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 컨테이너가 실제로 뜨는지 확인
+        run: |
+          docker run -d --name bg -p 3001:3001 boardgame:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/health > /dev/null; then
+              echo "헬스체크 통과"
+              curl -s http://localhost:3001/health
+              echo
+              code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/)
+              test "$code" = "200" && echo "SPA 서빙 OK" || { echo "SPA 응답 $code"; exit 1; }
+              docker rm -f bg > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "서버가 뜨지 않음"
+          docker logs bg
+          exit 1

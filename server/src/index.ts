@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { resolve } from 'node:path'
+import sirv from 'sirv'
 import { Server, type Socket } from 'socket.io'
 import { randomInt } from 'node:crypto'
 import {
@@ -29,21 +32,44 @@ import {
 } from './rooms.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
+const IS_PROD = process.env.NODE_ENV === 'production'
 /**
- * 개발 중에는 같은 와이파이의 친구가 http://192.168.x.x:5173 으로 들어올 수 있어야 하므로
- * origin을 열어둔다. 인터넷에 배포할 때는 CORS_ORIGIN을 반드시 지정할 것.
+ * CORS 정책
+ * - CORS_ORIGIN을 주면 그 값만 허용
+ * - 배포(NODE_ENV=production)에선 서버가 프론트까지 같이 주므로 **같은 오리진만** 허용(false)
+ * - 개발에선 같은 와이파이 친구가 http://192.168.x.x:5173 으로 들어와야 하므로 열어둔다
  */
-const ORIGIN: string | true = process.env.CORS_ORIGIN ?? true
+const ORIGIN: string | boolean = process.env.CORS_ORIGIN ?? !IS_PROD
 
 interface SocketData {
   roomCode?: string
   playerId?: string
 }
 
+/**
+ * 배포 시엔 서버가 빌드된 React 앱까지 같이 서빙한다.
+ * 서비스를 하나로 합치면 CORS가 사라지고, 무료 호스팅 1개 슬롯에 다 들어간다.
+ * WEB_DIST가 없으면(로컬 개발) 정적 서빙 없이 API만 뜬다.
+ */
+const webDist = process.env.WEB_DIST ?? resolve(import.meta.dirname, '../../web/dist')
+const serveWeb = existsSync(webDist)
+  ? sirv(webDist, { single: true, gzip: true, brotli: true, maxAge: 3600 })
+  : null
+
+if (serveWeb) console.log(`정적 파일 서빙: ${webDist}`)
+else console.log('정적 파일 없음 — API만 서빙 (개발 모드에선 vite가 따로 뜬다)')
+
 const http = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ ok: true, rooms: roomCount() }))
+    return
+  }
+  if (serveWeb) {
+    serveWeb(req, res, () => {
+      res.writeHead(404)
+      res.end()
+    })
     return
   }
   res.writeHead(404)
@@ -265,6 +291,9 @@ setInterval(() => {
   }
 }, 30_000).unref()
 
-http.listen(PORT, () => {
-  console.log(`보드게임 서버 http://localhost:${PORT}  (CORS: ${ORIGIN === true ? '전체 허용 — 개발용' : ORIGIN})`)
+// 컨테이너에서는 0.0.0.0에 바인딩해야 외부 트래픽이 들어온다
+http.listen(PORT, '0.0.0.0', () => {
+  const corsLabel =
+    ORIGIN === true ? '전체 허용 — 개발용' : ORIGIN === false ? '같은 오리진만' : String(ORIGIN)
+  console.log(`보드게임 서버 http://localhost:${PORT}  (CORS: ${corsLabel})`)
 })
