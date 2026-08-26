@@ -91,6 +91,17 @@ async function runBot(nickname) {
   await ask(s, 'room:ready', { ready: true })
   console.log(`  ${nickname} 입장`)
 
+  /**
+   * 대기실에서 준비 상태를 계속 유지한다.
+   * 방장이 설정(목표 점수·팀 조합)을 바꾸면 서버가 전원의 준비를 초기화하는데,
+   * 한 번만 준비하고 말면 봇은 영영 준비 안 된 상태로 남는다.
+   */
+  s.on('room:state', (room) => {
+    if (room.phase !== 'lobby') return
+    const me = room.players.find((p) => p.nickname === nickname)
+    if (me && !me.ready) void ask(s, 'room:ready', { ready: true })
+  })
+
   let latest = null
   s.on('game:view', (msg) => {
     latest = msg
