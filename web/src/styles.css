@@ -580,7 +580,7 @@ button { letter-spacing: 0.02em; }
   background: var(--surface); border: none;
   border-left: 3px solid var(--line);
   border-radius: var(--r); padding: 10px 16px;
-  min-height: 96px;
+  min-height: 121px;
   transition: min-height 0.15s;
 }
 /* 아직 아무도 안 낸 단계(교환·선언)에서는 줄을 낮춰 화면을 아끼다 */
@@ -627,7 +627,7 @@ button { letter-spacing: 0.02em; }
   line-height: 0;
 }
 .tcard--lg { width: 70px; height: 107px; }
-.tcard--md { width: 54px; height: 82px; }
+.tcard--md { width: 66px; height: 101px; }
 .tcard--sm { width: 42px; height: 64px; }
 .tcard__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tcard__text {
@@ -639,7 +639,7 @@ button { letter-spacing: 0.02em; }
 .tcard__as {
   position: absolute; bottom: 3px; right: 3px;
   background: var(--accent); color: #fff;
-  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
   line-height: 1.4;
 }
 .tcard.is-clickable { cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
@@ -688,6 +688,8 @@ button { letter-spacing: 0.02em; }
   .seatrow { flex-direction: column; align-items: stretch; gap: 8px; }
   .seatrow__who { width: auto; flex-direction: row; justify-content: space-between; align-items: center; }
   .tcard--lg { width: 62px; height: 95px; }
+  .tcard--md { width: 58px; height: 89px; }
+  .seatrow { min-height: auto; }
 }
 
 .topbar__right { display: flex; align-items: center; gap: 10px; }
