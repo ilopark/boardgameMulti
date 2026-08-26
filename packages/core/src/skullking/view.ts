@@ -1,7 +1,8 @@
 import type { SkGameState, SkPhase } from './game.js'
 import { cardCountFor, currentSeat, legalFor, totalRounds } from './game.js'
 import { countTricks, type SeatRoundScore } from './scoring.js'
-import type { SkCard, SkPlay, TrickOutcome } from './types.js'
+import type { SkCard, SkColor, SkPlay, TrickOutcome } from './types.js'
+import { computeLeadColor } from './trick.js'
 import { GHOST_SEAT, dealerForRound, hasGhost } from './turnorder.js'
 
 /**
@@ -44,6 +45,8 @@ export interface SkPlayerView {
   tricksWon: number[]
   /** 지금 테이블에 깔린 카드들 */
   trick: SkPlay[]
+  /** 지금 따라야 하는 색. 특수카드만 나왔거나 아직 비었으면 null */
+  leadColor: SkColor | null
   /** 방금 끝난 트릭 (trickEnd에서 결과를 보여주려고) */
   lastTrick: { plays: SkPlay[]; outcome: TrickOutcome } | null
   /** 방금 끝난 라운드 점수 */
@@ -78,6 +81,7 @@ export function viewFor(state: SkGameState, seat: number): SkPlayerView {
     bidsRevealed,
     tricksWon: countTricks(state.tricks, state.humanCount),
     trick: [...state.trick],
+    leadColor: computeLeadColor(state.trick),
     lastTrick: state.lastTrick,
     lastRoundScores: state.lastRoundScores,
     totals: [...state.totals],

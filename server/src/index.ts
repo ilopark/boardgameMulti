@@ -7,6 +7,7 @@ import { randomInt } from 'node:crypto'
 import {
   createRng,
   hashSeed,
+  TURN_POLICY,
   GAME_LABEL,
   josa,
   MIN_PLAYERS,
@@ -94,11 +95,89 @@ function broadcast(room: Room): void {
 function broadcastGame(room: Room): void {
   const game = room.skGame
   if (!game) return
+  const waitingFor = skullking.waitingSeats(game)
+  // 절대 시각이 아니라 남은 시간을 보낸다 — 클라이언트 시계가 어긋나 있어도 카운트다운이 맞는다
+  const remainingMs =
+    room.turnDeadline === null ? null : Math.max(0, room.turnDeadline - Date.now())
+
   for (const player of room.players.values()) {
     if (player.socketId === null || player.seat === null) continue
     const socket = io.sockets.sockets.get(player.socketId)
-    socket?.emit('game:view', skullking.viewFor(game, player.seat))
+    socket?.emit('game:view', {
+      view: skullking.viewFor(game, player.seat),
+      remainingMs,
+      waitingFor,
+    })
   }
+}
+
+function clearTurnTimer(room: Room): void {
+  if (room.turnTimer) {
+    clearTimeout(room.turnTimer)
+    room.turnTimer = null
+  }
+  room.turnDeadline = null
+}
+
+/**
+ * 제한시간을 건다. 시간이 다 되면 서버가 대신 행동한다.
+ * 트릭 테이킹은 "패스"가 없어서 누군가 자리를 비우면 판 전체가 멈추기 때문.
+ */
+function scheduleTurnTimeout(room: Room): void {
+  clearTurnTimer(room)
+  const game = room.skGame
+  if (!game) return
+  if (game.phase !== 'bidding' && game.phase !== 'playing') return
+
+  const limit = game.phase === 'bidding' ? TURN_POLICY.bidMs : TURN_POLICY.playMs
+  room.turnDeadline = Date.now() + limit
+  room.turnTimer = setTimeout(() => handleTurnTimeout(room), limit)
+}
+
+/** 시간 초과 — 대신 행동하고 계속 진행한다 */
+function handleTurnTimeout(room: Room): void {
+  const game = room.skGame
+  if (!game || !room.rng) return
+  try {
+    if (game.phase === 'bidding') {
+      // 아직 입찰 안 한 사람 전원을 0으로 처리
+      let next = game
+      for (let seat = 0; seat < next.humanCount; seat++) {
+        if (next.bids[seat] !== null) continue
+        next = skullking.reduce(next, { type: 'bid', seat, value: skullking.autoBid(next, seat) }, room.rng)
+      }
+      room.skGame = next
+      console.log(`[시간초과] ${room.code} 미입찰자 자동 0 입찰`)
+    } else if (game.phase === 'playing') {
+      const seat = skullking.currentSeat(game)
+      if (seat === null) return
+      const pick = skullking.pickWeakestLegal(game, seat)
+      if (!pick) return
+      room.skGame = skullking.reduce(
+        game,
+        pick.tigressAs
+          ? { type: 'play', seat, cardId: pick.card.id, tigressAs: pick.tigressAs }
+          : { type: 'play', seat, cardId: pick.card.id },
+        room.rng,
+      )
+      console.log(`[시간초과] ${room.code} ${seat}번 자동 제출 ${pick.card.id}`)
+    }
+  } catch (e) {
+    console.error('[시간초과 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
+}
+
+/**
+ * 게임 상태가 바뀐 뒤 공통 처리.
+ * **타이머를 먼저 세팅하고 그 다음에 뷰를 보낸다** — 순서가 반대면
+ * 클라이언트가 직전 단계의 남은 시간을 받아서 카운트다운이 엉뚱하게 나온다.
+ */
+function afterGameChange(room: Room): void {
+  scheduleTurnTimeout(room)
+  scheduleAdvance(room)
+  broadcastGame(room)
 }
 
 function clearAdvanceTimer(room: Room): void {
@@ -115,7 +194,7 @@ function advance(room: Room): void {
   if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
 
   clearAdvanceTimer(room)
-  room.readyToAdvance.clear()
+  clearTurnTimer(room)
   room.skGame = skullking.reduce(game, { type: 'advance' }, room.rng)
 
   const next = room.skGame
@@ -125,30 +204,27 @@ function advance(room: Room): void {
     room.phase = 'finished'
     broadcast(room)
   }
-  broadcastGame(room)
-  scheduleAdvance(room)
+  afterGameChange(room)
 }
 
-/** 결과 화면은 자동으로 넘어간다. 전원이 "다음"을 누르면 기다리지 않는다. */
-const TRICK_END_MS = 2600
-const ROUND_END_MS = 12000
-
+/** 결과 화면은 버튼 없이 자동으로 넘어간다 (공용 정책) */
 function scheduleAdvance(room: Room): void {
   clearAdvanceTimer(room)
   const game = room.skGame
   if (!game) return
   if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
-  const wait = game.phase === 'trickEnd' ? TRICK_END_MS : ROUND_END_MS
+  const wait = game.phase === 'trickEnd' ? TURN_POLICY.trickEndMs : TURN_POLICY.roundEndMs
+  room.turnDeadline = Date.now() + wait
   room.advanceTimer = setTimeout(() => advance(room), wait)
 }
 
 /** 게임을 끝내고 대기실로 되돌린다 */
 function resetToLobby(room: Room): void {
   clearAdvanceTimer(room)
+  clearTurnTimer(room)
   room.skGame = null
   room.rng = null
   room.dealerSeat = null
-  room.readyToAdvance.clear()
   room.phase = 'lobby'
   for (const p of room.players.values()) p.ready = false
 }
@@ -313,7 +389,7 @@ io.on('connection', (socket) => {
     room.phase = 'playing'
     cb({ ok: true })
     broadcast(room)
-    broadcastGame(room)
+    afterGameChange(room)
     const leader = skullking.roundFirstLeader(room.dealerSeat, seated.length)
     console.log(
       `[게임 시작] ${room.code} ${GAME_LABEL[room.game]} ${seated.length}명 ` +
@@ -345,7 +421,7 @@ io.on('connection', (socket) => {
   socket.on('game:bid', ({ value }, cb) => {
     withGame(cb, (room, seat, game) => {
       room.skGame = skullking.reduce(game, { type: 'bid', seat, value }, room.rng!)
-      broadcastGame(room)
+      afterGameChange(room)
     })
   })
 
@@ -356,19 +432,7 @@ io.on('connection', (socket) => {
         tigressAs ? { type: 'play', seat, cardId, tigressAs } : { type: 'play', seat, cardId },
         room.rng!,
       )
-      broadcastGame(room)
-      scheduleAdvance(room)
-    })
-  })
-
-  socket.on('game:ready', (_p, cb) => {
-    withGame(cb, (room, seat, game) => {
-      if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
-      room.readyToAdvance.add(seat)
-      const seated = [...room.players.values()].filter((p) => p.seat !== null).length
-      io.to(room.code).emit('game:ready', { ready: room.readyToAdvance.size, total: seated })
-      // 전원이 눌렀으면 타이머를 기다리지 않는다
-      if (room.readyToAdvance.size >= seated) advance(room)
+      afterGameChange(room)
     })
   })
 

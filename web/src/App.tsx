@@ -4,12 +4,22 @@ import { clearIdentity, loadIdentity, request, saveIdentity, socket } from './so
 import Lobby from './Lobby.js'
 import RoomView from './RoomView.js'
 import GameView from './game/GameView.js'
+import CardGallery from './game/CardGallery.js'
 
 type SkView = skullking.SkPlayerView
 
+/** 개발용 카드 갤러리 — /?cards */
+const IS_GALLERY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('cards')
+
+interface GameMsg {
+  view: SkView
+  remainingMs: number | null
+  waitingFor: number[]
+}
+
 export default function App() {
   const [room, setRoom] = useState<RoomPublic | null>(null)
-  const [gameView, setGameView] = useState<SkView | null>(null)
+  const [game, setGame] = useState<GameMsg | null>(null)
   const [myId, setMyId] = useState<string | null>(null)
   const [connected, setConnected] = useState(socket.connected)
   const [toast, setToast] = useState<string | null>(null)
@@ -25,13 +35,13 @@ export default function App() {
     const onState = (next: RoomPublic) => {
       setRoom(next)
       // 대기실로 돌아오면 게임 화면을 치운다
-      if (next.phase === 'lobby') setGameView(null)
+      if (next.phase === 'lobby') setGame(null)
     }
-    const onGameView = (v: unknown) => setGameView(v as SkView)
+    const onGameView = (msg: unknown) => setGame(msg as GameMsg)
     const onClosed = ({ reason }: { reason: string }) => {
       notify(reason)
       setRoom(null)
-      setGameView(null)
+      setGame(null)
       clearIdentity()
     }
 
@@ -95,7 +105,7 @@ export default function App() {
     await request('room:leave', {})
     clearIdentity()
     setRoom(null)
-    setGameView(null)
+    setGame(null)
     setMyId(null)
   }, [])
 
@@ -109,10 +119,13 @@ export default function App() {
       </header>
 
       <main className="main">
-        {room && myId && gameView && room.phase !== 'lobby' ? (
+        {IS_GALLERY && <CardGallery />}
+        {IS_GALLERY ? null : room && myId && game && room.phase !== 'lobby' ? (
           <GameView
             room={room}
-            view={gameView}
+            view={game.view}
+            remainingMs={game.remainingMs}
+            waitingFor={game.waitingFor}
             isHost={room.hostId === myId}
             onError={notify}
           />

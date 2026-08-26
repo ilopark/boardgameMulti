@@ -59,8 +59,6 @@ export interface ClientToServer {
   // ── 게임 진행 ──
   'game:bid': (p: { value: number }, cb: (r: Ack<null>) => void) => void
   'game:play': (p: { cardId: string; tigressAs?: 'pirate' | 'escape' }, cb: (r: Ack<null>) => void) => void
-  /** 트릭/라운드 결과를 다 봤으니 넘어가자 (전원이 누르면 타이머를 기다리지 않는다) */
-  'game:ready': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   /** 방장이 게임을 끝내고 대기실로 돌아간다 */
   'game:abort': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
 }
@@ -70,14 +68,27 @@ export interface ServerToClient {
   'room:state': (room: RoomPublic) => void
   /**
    * 게임 상태. **받는 사람에 맞춰 가려진 뷰**라 사람마다 내용이 다르다.
-   * 타입은 순환 참조를 피하려고 unknown으로 두고, 클라이언트가 SkPlayerView로 캐스팅한다.
+   * view의 타입은 순환 참조를 피하려고 unknown으로 두고, 클라이언트가 캐스팅한다.
    */
-  'game:view': (view: unknown) => void
-  /** 결과 화면에서 몇 명이 "다음"을 눌렀는지 */
-  'game:ready': (p: { ready: number; total: number }) => void
+  'game:view': (msg: GameViewMessage) => void
   'room:closed': (p: { reason: string }) => void
   /** 서버가 판단한 에러를 토스트로 띄우기 위한 채널 */
   'error:toast': (p: { message: string }) => void
+}
+
+/**
+ * 게임 뷰 + 진행 정보를 함께 담는다.
+ *
+ * 남은 시간을 **절대 시각이 아니라 남은 밀리초**로 보낸다.
+ * 클라이언트 시계가 서버와 몇 초씩 어긋나는 경우가 흔해서,
+ * 절대 시각을 보내면 카운트다운이 틀어진다.
+ */
+export interface GameViewMessage<V = unknown> {
+  view: V
+  /** 행동해야 하는 남은 시간(ms). null이면 제한 없음 */
+  remainingMs: number | null
+  /** 지금 기다리고 있는 좌석들 (입찰 단계면 여러 명) */
+  waitingFor: number[]
 }
 
 export const SEAT_COUNT: Record<GameId, number> = {

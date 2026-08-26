@@ -8,6 +8,13 @@ import {
 } from './types.js'
 import { DEFAULT_SK_OPTIONS, type SkRuleOptions } from './options.js'
 
+const COLOR_KO: Record<SkColor, string> = {
+  green: '앵무새(초록)',
+  yellow: '보물상자(노랑)',
+  purple: '지도(보라)',
+  black: '졸리로저(검정)',
+}
+
 /** 티그리스 선언을 반영한 "실제로 취급되는" 종류 */
 export type EffectiveKind =
   | 'number'
@@ -174,7 +181,7 @@ function collectBonuses(
       seat,
       kind: isTrump ? 'black14' : 'colored14',
       points,
-      detail: `${card.color} ${card.rank} 획득`,
+      detail: `${COLOR_KO[card.color]} ${card.rank} 획득`,
     })
   }
 

@@ -32,10 +32,12 @@ export interface Room {
   dealerSeat: number | null
   /** 진행 중인 스컬킹 게임 상태. 서버만 들고 있고, 클라이언트엔 가려진 뷰만 나간다. */
   skGame: SkGameState | null
-  /** 결과 화면에서 "다음"을 누른 좌석들 */
-  readyToAdvance: Set<number>
   /** trickEnd/roundEnd 자동 진행 타이머 */
   advanceTimer: NodeJS.Timeout | null
+  /** 제한시간 초과 시 대신 행동해 주는 타이머 */
+  turnTimer: NodeJS.Timeout | null
+  /** 지금 턴의 마감 시각(epoch ms). 없으면 null */
+  turnDeadline: number | null
   /** 카드를 돌릴 때 쓰는 난수. 방마다 하나를 계속 쓴다. */
   rng: Rng | null
   createdAt: number
@@ -69,8 +71,9 @@ export function createRoom(game: GameId, defaultOptions: Record<string, unknown>
     options: defaultOptions,
     dealerSeat: null,
     skGame: null,
-    readyToAdvance: new Set(),
     advanceTimer: null,
+    turnTimer: null,
+    turnDeadline: null,
     rng: null,
     createdAt: Date.now(),
   }
