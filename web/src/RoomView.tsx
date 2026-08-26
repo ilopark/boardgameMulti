@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react'
-import { GAME_LABEL, MIN_PLAYERS, skullking, type PlayerPublic, type RoomPublic } from '@bg/core'
+import {
+  GAME_LABEL,
+  MIN_PLAYERS,
+  skullking,
+  tichu,
+  type PlayerPublic,
+  type RoomPublic,
+} from '@bg/core'
 import { request } from './socket.js'
 
 interface Props {
@@ -96,8 +103,9 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
             )
           })}
         </ul>
-        {room.game === 'tichu' && (
-          <p className="muted">티츄는 1·3번, 2·4번이 한 팀입니다.</p>
+        {room.game === 'tichu' && <TeamHint room={room} />}
+        {room.game === 'tichu' && room.phase === 'lobby' && (
+          <TichuSettings room={room} isHost={isHost} busy={busy} run={run} />
         )}
         {room.game === 'skullking' && room.phase === 'lobby' && (
           <p className="muted">
@@ -161,5 +169,86 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
         </section>
       )}
     </div>
+  )
+}
+
+/** 티츄 방 설정 — 방장만 바꿀 수 있다 */
+function TichuSettings({
+  room,
+  isHost,
+  busy,
+  run,
+}: {
+  room: RoomPublic
+  isHost: boolean
+  busy: boolean
+  run: (fn: () => Promise<unknown>) => Promise<void>
+}) {
+  const opts = room.options as Partial<tichu.TichuRuleOptions>
+  const target = opts.targetScore ?? tichu.DEFAULT_TICHU_OPTIONS.targetScore
+  const pairing = opts.teamPairing ?? tichu.DEFAULT_TICHU_OPTIONS.teamPairing
+
+  const set = (patch: Partial<tichu.TichuRuleOptions>) =>
+    void run(() => request('room:options', { options: patch as Record<string, unknown> }))
+
+  return (
+    <div className="settings">
+      <div className="settings__row">
+        <span className="settings__label">목표 점수</span>
+        <div className="settings__opts">
+          {tichu.TARGET_SCORES.map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={target === n ? 'opt opt--on' : 'opt'}
+              disabled={!isHost || busy}
+              onClick={() => set({ targetScore: n })}
+            >
+              {n}점
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings__row">
+        <span className="settings__label">팀 조합</span>
+        <div className="settings__opts">
+          {(['random', 'seats12', 'seats13', 'seats14'] as tichu.TeamPairing[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={pairing === p ? 'opt opt--on' : 'opt'}
+              disabled={!isHost || busy}
+              onClick={() => set({ teamPairing: p })}
+            >
+              {tichu.TEAM_PAIRING_LABEL[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="muted">
+        {pairing === 'random'
+          ? '시작할 때 팀이 무작위로 정해집니다.'
+          : '고른 조합대로 마주 앉도록 자리가 재배치됩니다.'}
+        {!isHost && ' 방장만 바꿀 수 있습니다.'}
+      </p>
+    </div>
+  )
+}
+
+/** 지금 설정된 팀 조합을 자리 번호로 알려준다 */
+function TeamHint({ room }: { room: RoomPublic }) {
+  const opts = room.options as Partial<tichu.TichuRuleOptions>
+  const pairing = opts.teamPairing ?? tichu.DEFAULT_TICHU_OPTIONS.teamPairing
+  if (pairing === 'random') {
+    return <p className="muted">팀은 시작할 때 무작위로 정해집니다.</p>
+  }
+  const [a, b] = tichu.teamsOf(tichu.seatArrangement(pairing))
+  const fmt = (t: readonly number[]) => t.map((i) => `${i + 1}번`).join('·')
+  return (
+    <p className="muted">
+      팀: <strong>{fmt(a)}</strong> vs <strong>{fmt(b)}</strong>
+    </p>
   )
 }

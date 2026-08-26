@@ -13,12 +13,14 @@ import {
   MIN_PLAYERS,
   SEAT_COUNT,
   skullking,
+  tichu,
   type ClientToServer,
   type GameId,
   type ServerToClient,
 } from '@bg/core'
 import {
   addPlayer,
+  applySeatArrangement,
   compactSeats,
   createRoom,
   deleteRoom,
@@ -83,8 +85,10 @@ const io = new Server<ClientToServer, ServerToClient, Record<string, never>, Soc
 })
 
 function defaultOptions(game: GameId): Record<string, unknown> {
-  if (game === 'skullking') return { ...skullking.DEFAULT_SK_OPTIONS } as unknown as Record<string, unknown>
-  return { targetScore: 1000, counterClockwise: true, allowBombInterrupt: true }
+  if (game === 'skullking') {
+    return { ...skullking.DEFAULT_SK_OPTIONS } as unknown as Record<string, unknown>
+  }
+  return { ...tichu.DEFAULT_TICHU_OPTIONS } as unknown as Record<string, unknown>
 }
 
 function broadcast(room: Room): void {
@@ -93,9 +97,13 @@ function broadcast(room: Room): void {
 
 /** 각자에게 **자기 것만 보이는** 게임 뷰를 보낸다. 사람마다 내용이 다르다. */
 function broadcastGame(room: Room): void {
-  const game = room.skGame
-  if (!game) return
-  const waitingFor = skullking.waitingSeats(game)
+  const waitingFor = room.skGame
+    ? skullking.waitingSeats(room.skGame)
+    : room.tichuGame
+      ? tichu.waitingSeats(room.tichuGame)
+      : null
+  if (waitingFor === null) return
+
   // 절대 시각이 아니라 남은 시간을 보낸다 — 클라이언트 시계가 어긋나 있어도 카운트다운이 맞는다
   const remainingMs =
     room.turnDeadline === null ? null : Math.max(0, room.turnDeadline - Date.now())
@@ -103,12 +111,16 @@ function broadcastGame(room: Room): void {
   for (const player of room.players.values()) {
     if (player.socketId === null || player.seat === null) continue
     const socket = io.sockets.sockets.get(player.socketId)
-    socket?.emit('game:view', {
-      view: skullking.viewFor(game, player.seat),
-      remainingMs,
-      waitingFor,
-    })
+    const view = room.skGame
+      ? skullking.viewFor(room.skGame, player.seat)
+      : tichu.viewFor(room.tichuGame!, player.seat)
+    socket?.emit('game:view', { view, remainingMs, waitingFor })
   }
+}
+
+/** 지금 진행 중인 게임의 단계 이름 (제한시간 계산용) */
+function currentPhase(room: Room): string | null {
+  return room.skGame?.phase ?? room.tichuGame?.phase ?? null
 }
 
 function clearTurnTimer(room: Room): void {
@@ -125,17 +137,27 @@ function clearTurnTimer(room: Room): void {
  */
 function scheduleTurnTimeout(room: Room): void {
   clearTurnTimer(room)
-  const game = room.skGame
-  if (!game) return
-  if (game.phase !== 'bidding' && game.phase !== 'playing') return
+  const phase = currentPhase(room)
+  if (phase === null) return
 
-  const limit = game.phase === 'bidding' ? TURN_POLICY.bidMs : TURN_POLICY.playMs
+  // 생각할 게 많은 단계는 bidMs, 카드 한 장 내는 건 playMs (공용 정책)
+  const THINKING: Record<string, number> = {
+    bidding: TURN_POLICY.bidMs,
+    grandTichu: TURN_POLICY.bidMs,
+    passing: TURN_POLICY.bidMs,
+    playing: TURN_POLICY.playMs,
+    dragonGift: TURN_POLICY.playMs,
+  }
+  const limit = THINKING[phase]
+  if (limit === undefined) return
+
   room.turnDeadline = Date.now() + limit
   room.turnTimer = setTimeout(() => handleTurnTimeout(room), limit)
 }
 
 /** 시간 초과 — 대신 행동하고 계속 진행한다 */
 function handleTurnTimeout(room: Room): void {
+  if (room.tichuGame && room.rng) return handleTichuTimeout(room)
   const game = room.skGame
   if (!game || !room.rng) return
   try {
@@ -169,6 +191,26 @@ function handleTurnTimeout(room: Room): void {
   afterGameChange(room)
 }
 
+/** 티츄 시간 초과 — 기다리는 사람 전원을 대신 처리한다 */
+function handleTichuTimeout(room: Room): void {
+  const rng = room.rng
+  if (!rng) return
+  try {
+    let game = room.tichuGame!
+    for (const seat of tichu.waitingSeats(game)) {
+      const action = tichu.autoAction(game, seat)
+      if (!action) continue
+      game = tichu.reduce(game, action, rng)
+      console.log(`[시간초과] ${room.code} 티츄 ${seat}번 자동 ${action.type}`)
+    }
+    room.tichuGame = game
+  } catch (e) {
+    console.error('[티츄 시간초과 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
+}
+
 /**
  * 게임 상태가 바뀐 뒤 공통 처리.
  * **타이머를 먼저 세팅하고 그 다음에 뷰를 보낸다** — 순서가 반대면
@@ -189,20 +231,27 @@ function clearAdvanceTimer(room: Room): void {
 
 /** 결과 화면(trickEnd/roundEnd)에서 다음으로 넘어간다 */
 function advance(room: Room): void {
-  const game = room.skGame
-  if (!game || !room.rng) return
-  if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
+  if (!room.rng) return
+  const phase = currentPhase(room)
+  if (phase !== 'trickEnd' && phase !== 'roundEnd') return
 
   clearAdvanceTimer(room)
   clearTurnTimer(room)
-  room.skGame = skullking.reduce(game, { type: 'advance' }, room.rng)
 
-  const next = room.skGame
-  room.dealerSeat = skullking.dealerForRound(next.initialDealer, next.roundIndex, next.humanCount)
-
-  if (next.phase === 'gameEnd') {
-    room.phase = 'finished'
-    broadcast(room)
+  if (room.skGame) {
+    room.skGame = skullking.reduce(room.skGame, { type: 'advance' }, room.rng)
+    const next = room.skGame
+    room.dealerSeat = skullking.dealerForRound(next.initialDealer, next.roundIndex, next.humanCount)
+    if (next.phase === 'gameEnd') {
+      room.phase = 'finished'
+      broadcast(room)
+    }
+  } else if (room.tichuGame) {
+    room.tichuGame = tichu.reduce(room.tichuGame, { type: 'advance' }, room.rng)
+    if (room.tichuGame.phase === 'gameEnd') {
+      room.phase = 'finished'
+      broadcast(room)
+    }
   }
   afterGameChange(room)
 }
@@ -210,10 +259,9 @@ function advance(room: Room): void {
 /** 결과 화면은 버튼 없이 자동으로 넘어간다 (공용 정책) */
 function scheduleAdvance(room: Room): void {
   clearAdvanceTimer(room)
-  const game = room.skGame
-  if (!game) return
-  if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
-  const wait = game.phase === 'trickEnd' ? TURN_POLICY.trickEndMs : TURN_POLICY.roundEndMs
+  const phase = currentPhase(room)
+  if (phase !== 'trickEnd' && phase !== 'roundEnd') return
+  const wait = phase === 'trickEnd' ? TURN_POLICY.trickEndMs : TURN_POLICY.roundEndMs
   room.turnDeadline = Date.now() + wait
   room.advanceTimer = setTimeout(() => advance(room), wait)
 }
@@ -223,6 +271,8 @@ function resetToLobby(room: Room): void {
   clearAdvanceTimer(room)
   clearTurnTimer(room)
   room.skGame = null
+  room.tichuGame = null
+  room.seatArrangement = null
   room.rng = null
   room.dealerSeat = null
   room.phase = 'lobby'
@@ -384,6 +434,11 @@ io.on('connection', (socket) => {
     if (room.game === 'skullking') {
       const opts = skullking.makeSkOptions(room.options as Partial<skullking.SkRuleOptions>)
       room.skGame = skullking.createGame(seated.length, opts, room.dealerSeat, room.rng)
+    } else {
+      const opts = tichu.makeTichuOptions(room.options as Partial<tichu.TichuRuleOptions>)
+      // 팀 조합에 맞춰 실제 자리를 바꾼다 — 티츄는 파트너가 마주 앉아야 룰이 성립한다
+      applySeatArrangement(room, tichu.seatArrangement(opts.teamPairing, room.rng))
+      room.tichuGame = tichu.createGame(opts, room.rng)
     }
 
     room.phase = 'playing'
@@ -433,6 +488,70 @@ io.on('connection', (socket) => {
         room.rng!,
       )
       afterGameChange(room)
+    })
+  })
+
+  /** 티츄 액션 공통 처리 */
+  function withTichu(
+    cb: (r: { ok: boolean; error?: string }) => void,
+    make: (seat: number, game: tichu.TichuGameState) => tichu.TichuAction | null,
+  ): void {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (!room.tichuGame || !room.rng) return cb({ ok: false, error: '진행 중인 티츄 게임이 없습니다.' })
+    if (player.seat === null) return cb({ ok: false, error: '자리에 앉아 있지 않습니다.' })
+    try {
+      const action = make(player.seat, room.tichuGame)
+      if (!action) return cb({ ok: false, error: '지금 할 수 없는 행동입니다.' })
+      room.tichuGame = tichu.reduce(room.tichuGame, action, room.rng)
+      cb({ ok: true })
+      afterGameChange(room)
+    } catch (e) {
+      // 규칙 위반은 정상적인 흐름이다. 서버를 죽이지 않고 메시지만 돌려준다.
+      if (e instanceof tichu.TichuRuleError) return cb({ ok: false, error: e.message })
+      console.error('[티츄 액션 오류]', e)
+      cb({ ok: false, error: '알 수 없는 오류가 발생했습니다.' })
+    }
+  }
+
+  socket.on('tichu:grand', ({ call }, cb) => {
+    withTichu(cb, (seat) => ({ type: 'grandTichu', seat, call: Boolean(call) }))
+  })
+
+  socket.on('tichu:pass3', ({ cardIds }, cb) => {
+    withTichu(cb, (seat) => {
+      if (!Array.isArray(cardIds) || cardIds.length !== 3) return null
+      return { type: 'pass3', seat, cardIds: cardIds as [string, string, string] }
+    })
+  })
+
+  socket.on('tichu:call', (_p, cb) => {
+    withTichu(cb, (seat) => ({ type: 'tichu', seat }))
+  })
+
+  socket.on('tichu:play', ({ cardIds, phoenixAs, asBomb }, cb) => {
+    withTichu(cb, (seat) => {
+      if (!Array.isArray(cardIds) || cardIds.length === 0) return null
+      const action: tichu.TichuAction = { type: 'play', seat, cardIds }
+      if (typeof phoenixAs === 'number') action.phoenixAs = phoenixAs
+      if (typeof asBomb === 'boolean') action.asBomb = asBomb
+      return action
+    })
+  })
+
+  socket.on('tichu:pass', (_p, cb) => {
+    withTichu(cb, (seat) => ({ type: 'pass', seat }))
+  })
+
+  socket.on('tichu:wish', ({ rank }, cb) => {
+    withTichu(cb, (seat) => ({ type: 'wish', seat, rank: rank ?? null }))
+  })
+
+  socket.on('tichu:dragon', ({ to }, cb) => {
+    withTichu(cb, (seat) => {
+      if (!Number.isInteger(to) || to < 0 || to > 3) return null
+      return { type: 'giveDragon', seat, to }
     })
   })
 

@@ -61,6 +61,23 @@ export interface ClientToServer {
   'game:play': (p: { cardId: string; tigressAs?: 'pirate' | 'escape' }, cb: (r: Ack<null>) => void) => void
   /** 방장이 게임을 끝내고 대기실로 돌아간다 */
   'game:abort': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+
+  // ── 티츄 전용 ──
+  /** 8장 보고 그랜드 티츄를 부를지 결정 */
+  'tichu:grand': (p: { call: boolean }, cb: (r: Ack<null>) => void) => void
+  /** 교환할 3장 [왼쪽, 파트너, 오른쪽] */
+  'tichu:pass3': (p: { cardIds: [string, string, string] }, cb: (r: Ack<null>) => void) => void
+  /** 스몰 티츄 선언 */
+  'tichu:call': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  'tichu:play': (
+    p: { cardIds: string[]; phoenixAs?: number; asBomb?: boolean },
+    cb: (r: Ack<null>) => void,
+  ) => void
+  'tichu:pass': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 마작 소원. null이면 부르지 않음 */
+  'tichu:wish': (p: { rank: number | null }, cb: (r: Ack<null>) => void) => void
+  /** 용으로 딴 트릭을 상대팀 누구에게 줄지 */
+  'tichu:dragon': (p: { to: number }, cb: (r: Ack<null>) => void) => void
 }
 
 /** 서버 → 클라이언트 */

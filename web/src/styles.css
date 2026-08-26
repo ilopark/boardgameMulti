@@ -438,3 +438,16 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   .countdown { width: 104px; }
   .turnbanner__text strong { font-size: 15px; }
 }
+
+/* 방 설정 (티츄 목표점수 · 팀 조합) */
+.settings { display: flex; flex-direction: column; gap: 10px; }
+.settings__row { display: flex; flex-direction: column; gap: 6px; }
+.settings__label { font-size: 12px; color: var(--muted); }
+.settings__opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt {
+  background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--text); font-size: 13px; padding: 8px 12px;
+}
+.opt--on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.opt:disabled { opacity: 0.5; }
+.opt--on:disabled { opacity: 0.85; }

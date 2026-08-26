@@ -6,9 +6,11 @@ import {
   type RoomPublic,
   type Rng,
   type skullking,
+  type tichu,
 } from '@bg/core'
 
 type SkGameState = skullking.SkGameState
+type TichuGameState = tichu.TichuGameState
 
 export interface Player {
   id: string
@@ -32,6 +34,10 @@ export interface Room {
   dealerSeat: number | null
   /** 진행 중인 스컬킹 게임 상태. 서버만 들고 있고, 클라이언트엔 가려진 뷰만 나간다. */
   skGame: SkGameState | null
+  /** 진행 중인 티츄 게임 상태 */
+  tichuGame: TichuGameState | null
+  /** 티츄 시작 시 정해진 자리 배치. arrangement[게임좌석] = 로비 자리 */
+  seatArrangement: number[] | null
   /** trickEnd/roundEnd 자동 진행 타이머 */
   advanceTimer: NodeJS.Timeout | null
   /** 제한시간 초과 시 대신 행동해 주는 타이머 */
@@ -71,6 +77,8 @@ export function createRoom(game: GameId, defaultOptions: Record<string, unknown>
     options: defaultOptions,
     dealerSeat: null,
     skGame: null,
+    tichuGame: null,
+    seatArrangement: null,
     advanceTimer: null,
     turnTimer: null,
     turnDeadline: null,
@@ -204,4 +212,23 @@ export function compactSeats(room: Room): void {
   seated.forEach((p, i) => {
     p.seat = i
   })
+}
+
+/**
+ * 팀 조합에 맞춰 자리를 재배치한다.
+ *
+ * arrangement[게임좌석] = 그 자리에 앉을 **현재 자리 번호**.
+ * 티츄는 파트너가 마주 앉아야(0·2 / 1·3) 룰이 성립하므로,
+ * "누구랑 팀"을 고르면 실제 좌석을 바꿔서 맞춘다.
+ */
+export function applySeatArrangement(room: Room, arrangement: readonly number[]): void {
+  const byCurrentSeat = new Map<number, Player>()
+  for (const p of room.players.values()) {
+    if (p.seat !== null) byCurrentSeat.set(p.seat, p)
+  }
+  arrangement.forEach((fromSeat, gameSeat) => {
+    const player = byCurrentSeat.get(fromSeat)
+    if (player) player.seat = gameSeat
+  })
+  room.seatArrangement = [...arrangement]
 }

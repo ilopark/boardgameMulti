@@ -378,3 +378,62 @@ describe('팀 조합', () => {
     expect(partitions.size).toBe(3)
   })
 })
+
+describe('뷰 마스킹', () => {
+  it('남의 손패는 장수만 보인다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const g = toPlaying()
+    const v = viewFor(g, 0)
+    expect(v.hand).toHaveLength(14)
+    expect(v.seats.map((s) => s.cards)).toEqual([14, 14, 14, 14])
+
+    const json = JSON.stringify(v)
+    for (const seat of [1, 2, 3]) {
+      for (const card of g.hands[seat]!) {
+        expect(json.includes(`"${card.id}"`)).toBe(false)
+      }
+    }
+  })
+
+  it('선언과 팀이 좌석별로 나온다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    g = reduce(g, { type: 'tichu', seat: 1 }, r)
+    const v = viewFor(g, 0)
+    expect(v.seats[1]!.declaration).toBe('tichu')
+    expect(v.seats.map((s) => s.team)).toEqual([0, 1, 0, 1])
+  })
+
+  it('패스한 사람이 표시된다 (화면에 카드 뒷면으로 쓸 값)', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5)])
+    setHand(g, 1, [c('sword', 9)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    const v = viewFor(g, 2)
+    expect(v.seats[1]!.passed).toBe(true)
+    expect(v.seats[0]!.played?.cards[0]!.id).toBe('jade-5')
+    expect(v.seats[0]!.leading).toBe(true)
+  })
+
+  it('용을 낸 사람에게만 넘길 후보가 보인다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [dragon])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['dragon'] }, r)
+    for (const s of [1, 2, 3]) g = reduce(g, { type: 'pass', seat: s }, r)
+    expect(viewFor(g, 0).dragonTargets).toEqual([1, 3])
+    expect(viewFor(g, 1).dragonTargets).toEqual([])
+  })
+})
