@@ -60,7 +60,7 @@ export default function App() {
     const onAnnounce = (p: { kind: 'tichu' | 'grand'; nickname: string }) => {
       setAnnounce(p)
       clearTimeout(announceTimer)
-      announceTimer = setTimeout(() => setAnnounce(null), 1600)
+      announceTimer = setTimeout(() => setAnnounce(null), 1200)
     }
     const onClosed = ({ reason }: { reason: string }) => {
       notify(reason)

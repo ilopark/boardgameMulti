@@ -125,14 +125,18 @@ export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
 
   const seats: TichuSeatInfo[] = [0, 1, 2, 3].map((s) => {
     const finishedIdx = state.finishOrder.indexOf(s)
+    const isPassed = state.trickAction[s] === 'pass'
+    // 패스했으면 **아까 낸 카드가 있어도** 덮어둔다.
+    // 트릭 도중에 냈다가 나중에 패스하는 경우가 있는데, 그때도 뒷면이 보여야 한다.
+    const played = isPassed ? null : (lastPlayBySeat.get(s) ?? dogComboFor(state, s))
     return {
       seat: s,
       team: teamOf(s),
       cards: state.hands[s]?.length ?? 0,
       declaration: state.declarations[s] ?? 'none',
-      played: lastPlayBySeat.get(s) ?? dogComboFor(state, s),
-      playedDog: lastPlayBySeat.get(s) === undefined && state.dogNote?.seat === s,
-      passed: state.trickAction[s] === 'pass',
+      played,
+      playedDog: !isPassed && lastPlayBySeat.get(s) === undefined && state.dogNote?.seat === s,
+      passed: isPassed,
       wonPoints: handPoints(state.won[s] ?? []),
       leading: leadingSeat === s,
       finished: finishedIdx >= 0 ? finishedIdx + 1 : null,

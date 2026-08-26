@@ -685,6 +685,33 @@ describe('뷰 마스킹', () => {
     expect(viewFor(g, 0).seats[1]!.played?.cards[0]!.id).toBe('sword-14')
   })
 
+  it('카드를 냈다가 나중에 패스해도 뒷면으로 덮인다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5), c('jade', 14)])
+    setHand(g, 1, [c('sword', 9), c('sword', 3)])
+    setHand(g, 2, [c('pagoda', 11), c('pagoda', 12)])
+    setHand(g, 3, [c('star', 13), c('star', 2)])
+    g.turn = 0
+    g.leader = 0
+
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-9'] }, r) // 1번이 카드를 냈다
+    expect(viewFor(g, 2).seats[1]!.played?.cards[0]!.id).toBe('sword-9')
+    expect(viewFor(g, 2).seats[1]!.passed).toBe(false)
+
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    g = reduce(g, { type: 'pass', seat: 3 }, r)
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-14'] }, r) // 트릭이 계속 살아 있게
+    // 1번이 이번엔 패스 → 아까 낸 sword-9가 아니라 뒷면이 보여야 한다
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    expect(g.phase).toBe('playing') // 트릭이 아직 안 끝났다
+    const v = viewFor(g, 2)
+    expect(v.seats[1]!.passed).toBe(true)
+    expect(v.seats[1]!.played).toBeNull()
+  })
+
   it('트릭이 끝나면 패스 표시가 초기화된다', async () => {
     const { viewFor } = await import('../src/tichu/view.js')
     const r = rng()
