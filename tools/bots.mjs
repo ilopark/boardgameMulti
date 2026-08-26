@@ -8,13 +8,34 @@
  */
 import { io } from 'socket.io-client'
 
-const SERVER = process.env.SERVER_URL ?? 'http://localhost:3001'
 const [code, ...names] = process.argv.slice(2)
+
+/**
+ * 서버가 어느 포트에 떠 있는지 찾는다.
+ * `npm run dev`는 3001, `npm run share`는 3100을 쓴다.
+ * 둘 다 안 켜져 있으면 안내하고 끝낸다.
+ */
+const CANDIDATES = ['http://localhost:3001', 'http://localhost:3100']
+
+async function findServer() {
+  if (process.env.SERVER_URL) return process.env.SERVER_URL
+  for (const url of CANDIDATES) {
+    try {
+      const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(1500) })
+      if (res.ok) return url
+    } catch {
+      // 이 포트엔 없다. 다음 후보로.
+    }
+  }
+  return null
+}
 
 if (!code) {
   console.error('사용법: npm run bots -- <방코드> [봇이름...]')
   process.exit(1)
 }
+
+let SERVER = ''
 
 const ask = (s, ev, p) => new Promise((r) => s.emit(ev, p, r))
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -140,6 +161,18 @@ async function act(s, v) {
   }
   return false
 }
+
+SERVER = (await findServer()) ?? ''
+if (!SERVER) {
+  console.error(
+    '서버를 찾을 수 없습니다. 다른 터미널에서 먼저 실행하세요:\n' +
+      '\n  npm run dev      (개발용, 3001)\n' +
+      '  npm run share    (친구 공유용, 3100)\n' +
+      '\n다른 포트면: SERVER_URL=http://localhost:포트 npm run bots -- <방코드>',
+  )
+  process.exit(1)
+}
+console.log(`서버 ${SERVER}`)
 
 const count = names.length > 0 ? names.length : await seatsToFill()
 if (count <= 0) {
