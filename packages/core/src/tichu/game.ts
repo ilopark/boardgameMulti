@@ -77,6 +77,22 @@ export interface TichuGameState {
   trickAction: Array<'play' | 'pass' | null>
   /** 마작 소원. 아직 이행되지 않은 값 */
   wish: number | null
+  /**
+   * 마작을 낸 뒤 **소원을 고르는 중인 좌석**. 이 값이 있으면 그 좌석의 소원 선택만 받고
+   * 나머지 전원은 행동할 수 없다. 소원을 고르거나(또는 시간초과로 소원 없음) 해제된다.
+   */
+  awaitingWish: number | null
+  /**
+   * 트릭이 곧 닫힘 — **폭탄 창구**가 열린 상태. 트릭은 테이블에 그대로 두고,
+   * 이 동안 누구든 (턴이 아니어도) 폭탄을 던질 수 있다. 폭탄이 없으면 winner가 가져간다.
+   * 서버가 잠깐 뒤 collectTrick 으로 실제 마감한다.
+   */
+  pendingClose: { winner: number } | null
+  /**
+   * 폭탄 창구에서 **"폭탄 내기"를 예약한 좌석**. 이 값이 있으면 진행이 멈추고,
+   * 그 좌석만 (더 넉넉한 시간 동안) 폭탄을 제출할 수 있다. 제출하거나 취소/시간초과되면 풀린다.
+   */
+  bombClaim: number | null
   /** 손패를 턴 순서 (먼저 턴 사람부터) */
   finishOrder: number[]
   /** 좌석별로 따놓은 카드 */
@@ -103,6 +119,12 @@ export type TichuAction =
   | { type: 'pass'; seat: number }
   | { type: 'wish'; seat: number; rank: number | null }
   | { type: 'giveDragon'; seat: number; to: number }
+  /** 폭탄 창구가 끝나 트릭을 실제로 걷어간다 (서버 타이머가 보낸다) */
+  | { type: 'collectTrick' }
+  /** 폭탄 창구에서 "폭탄 내기"를 예약 — 진행을 멈추고 그 좌석에게 제출 시간을 준다 */
+  | { type: 'claimBomb'; seat: number }
+  /** 폭탄 예약 취소(또는 시간초과) — 트릭을 걷고 진행 */
+  | { type: 'cancelBomb'; seat: number }
   | { type: 'advance' }
 
 export class TichuRuleError extends Error {}
@@ -132,6 +154,9 @@ export function createGame(opts: TichuRuleOptions = DEFAULT_TICHU_OPTIONS, rng?:
     passed: [false, false, false, false],
     trickAction: [null, null, null, null],
     wish: null,
+    awaitingWish: null,
+    pendingClose: null,
+    bombClaim: null,
     finishOrder: [],
     won: [[], [], [], []],
     pendingDragon: null,
@@ -161,6 +186,8 @@ export function startRound(state: TichuGameState, rng: Rng): void {
   state.passed = [false, false, false, false]
   state.trickAction = [null, null, null, null]
   state.wish = null
+  state.awaitingWish = null
+  state.pendingClose = null
   state.finishOrder = []
   state.won = [[], [], [], []]
   state.pendingDragon = null
@@ -254,9 +281,13 @@ function applyTichu(state: TichuGameState, seat: number): void {
 }
 
 function applyWish(state: TichuGameState, seat: number, rank: number | null): void {
-  // 마작을 낸 직후에만 부를 수 있다. 서버가 순서를 보장하므로 여기서는 값만 검증.
+  // 마작을 낸 사람이 "소원 대기" 중일 때만. 그 좌석만.
+  if (state.awaitingWish !== seat) err('지금은 소원을 부를 수 없습니다.')
   if (rank !== null && (rank < 2 || rank > 14)) err('소원은 2~A(14) 사이의 숫자여야 합니다.')
   state.wish = rank
+  state.awaitingWish = null
+  // 소원이 정해졌으니 이제 정상 진행 — 마작 리드 다음 사람으로 턴을 넘긴다
+  advanceAfterPlay(state, seat)
 }
 
 /**
@@ -320,6 +351,56 @@ export function legalPlaysContainingWish(state: TichuGameState, seat: number): s
   return out
 }
 
+/** 카드를 낸(또는 소원을 정한) 뒤: 다음 사람에게 넘기거나, 아무도 안 남았으면 트릭을 닫는다 */
+function advanceAfterPlay(state: TichuGameState, seat: number): void {
+  const next = nextTurn(state, seat)
+  if (next === null || next === seat) beginClose(state, seat)
+  else state.turn = next
+}
+
+/**
+ * 트릭을 바로 닫지 않고 **폭탄 창구**를 연다.
+ * 트릭은 테이블에 그대로 두고, 서버가 잠깐 뒤 collectTrick 으로 마감한다.
+ * 이미 라운드가 끝났으면(3명 아웃 등) 창구 없이 바로 마감한다.
+ */
+function beginClose(state: TichuGameState, winner: number): void {
+  if (isRoundOver(state)) {
+    finishTrick(state, winner)
+    return
+  }
+  state.pendingClose = { winner }
+}
+
+/** 폭탄 창구가 끝났다 — 트릭을 실제로 걷어간다 */
+function applyCollect(state: TichuGameState): void {
+  const pc = state.pendingClose
+  if (!pc) err('걷어갈 트릭이 없습니다.')
+  state.pendingClose = null
+  state.bombClaim = null
+  finishTrick(state, pc.winner)
+}
+
+/** 폭탄 창구에서 "폭탄 내기"를 예약한다 — 진행이 멈추고 그 좌석에게 제출 시간을 준다 */
+function applyClaimBomb(state: TichuGameState, seat: number): void {
+  if (state.pendingClose === null) err('지금은 폭탄을 예약할 수 없습니다.')
+  if (state.bombClaim !== null) err('이미 다른 사람이 폭탄을 예약했습니다.')
+  // 이미 손패를 다 낸(골인한) 사람은 폭탄이 없으므로 예약할 수 없다
+  if (!stillIn(state, seat)) err('이미 손패를 다 냈습니다.')
+  state.bombClaim = seat
+}
+
+/** 폭탄 예약 취소(또는 시간초과) — 트릭을 걷어가고 진행한다 */
+function applyCancelBomb(state: TichuGameState, seat: number): void {
+  if (state.bombClaim === null) err('예약된 폭탄이 없습니다.')
+  if (state.bombClaim !== seat) err('폭탄을 예약한 사람만 취소할 수 있습니다.')
+  state.bombClaim = null
+  const pc = state.pendingClose
+  if (pc) {
+    state.pendingClose = null
+    finishTrick(state, pc.winner)
+  }
+}
+
 function applyPlay(
   state: TichuGameState,
   seat: number,
@@ -327,6 +408,9 @@ function applyPlay(
   parseOpts: ParseOptions,
 ): void {
   if (state.phase !== 'playing') err('지금은 카드를 낼 때가 아닙니다.')
+  if (state.awaitingWish !== null) err('마작 소원을 정하는 중입니다. 잠시만 기다려주세요.')
+  // 누군가 폭탄을 예약했으면 그 사람만 낼 수 있다 (다른 사람은 대기)
+  if (state.bombClaim !== null && state.bombClaim !== seat) err('폭탄 낼 사람을 기다리는 중입니다.')
   if (!stillIn(state, seat)) err('이미 손패를 다 냈습니다.')
 
   const hand = state.hands[seat] ?? []
@@ -344,6 +428,8 @@ function applyPlay(
 
   const isBomb = combo.isBomb
   const myTurn = state.turn === seat
+  // 폭탄 창구가 열린 동안에는 **폭탄만** 받는다 (일반 카드·패스는 창구가 끝난 뒤)
+  if (state.pendingClose !== null && !isBomb) err('지금은 폭탄만 낼 수 있습니다.')
   if (!myTurn) {
     if (!isBomb) err('당신 차례가 아닙니다.')
     if (!state.opts.allowBombInterrupt) err('이 방에서는 턴이 아닐 때 폭탄을 낼 수 없습니다.')
@@ -351,6 +437,10 @@ function applyPlay(
   }
 
   if (!canBeat(combo, state.current)) err('테이블 위 조합을 이길 수 없습니다.')
+
+  // 폭탄이 들어왔으면 닫히려던 창구·예약을 모두 풀고 판이 다시 굴러간다
+  if (state.pendingClose !== null) state.pendingClose = null
+  state.bombClaim = null
 
   // 소원 이행 강제 — 폭탄을 자기 턴이 아닐 때 던지는 경우는 예외
   if (state.wish !== null && myTurn) {
@@ -397,16 +487,19 @@ function applyPlay(
     return
   }
 
-  const next = nextTurn(state, seat)
-  if (next === null || next === seat) {
-    finishTrick(state, seat)
-  } else {
-    state.turn = next
+  // 마작을 냈으면 소원을 정할 때까지 대기 — 다른 사람은 아무도 행동 못 한다
+  if (cards.some((c) => c.kind === 'mahjong')) {
+    state.awaitingWish = seat
+    return
   }
+
+  advanceAfterPlay(state, seat)
 }
 
 function applyPass(state: TichuGameState, seat: number): void {
   if (state.phase !== 'playing') err('지금은 패스할 수 없습니다.')
+  if (state.awaitingWish !== null) err('마작 소원을 정하는 중입니다. 잠시만 기다려주세요.')
+  if (state.pendingClose !== null) err('지금은 폭탄만 낼 수 있습니다.')
   if (state.turn !== seat) err('당신 차례가 아닙니다.')
   if (state.current === null) err('리드할 때는 패스할 수 없습니다. 카드를 내야 합니다.')
   if (mustFulfillWish(state, seat)) err(`마작 소원(${state.wish})을 낼 수 있으면 반드시 내야 합니다.`)
@@ -417,7 +510,8 @@ function applyPass(state: TichuGameState, seat: number): void {
   const winner = state.trick[state.trick.length - 1]?.seat
   if (next === null || next === winner) {
     if (winner === undefined) err('트릭에 아무도 내지 않았습니다.')
-    finishTrick(state, winner)
+    // 바로 닫지 않고 폭탄 창구를 연다 (마지막 패스 후, 카드를 걷기 전)
+    beginClose(state, winner)
   } else {
     state.turn = next
   }
@@ -580,6 +674,15 @@ export function reduce(state: TichuGameState, action: TichuAction, rng: Rng): Ti
     case 'giveDragon':
       applyGiveDragon(next, action.seat, action.to)
       break
+    case 'collectTrick':
+      applyCollect(next)
+      break
+    case 'claimBomb':
+      applyClaimBomb(next, action.seat)
+      break
+    case 'cancelBomb':
+      applyCancelBomb(next, action.seat)
+      break
     case 'advance':
       applyAdvance(next, rng)
       break
@@ -604,6 +707,7 @@ function clone(s: TichuGameState): TichuGameState {
     finishOrder: [...s.finishOrder],
     won: s.won.map((w) => [...w]),
     pendingDragon: s.pendingDragon ? { ...s.pendingDragon, cards: [...s.pendingDragon.cards] } : null,
+    pendingClose: s.pendingClose ? { ...s.pendingClose } : null,
     dogNote: s.dogNote ? { ...s.dogNote } : null,
     totals: [...s.totals] as [number, number],
     history: [...s.history],
@@ -618,6 +722,10 @@ export function waitingSeats(state: TichuGameState): number[] {
     case 'passing':
       return SEATS.filter((s) => state.passSelections[s] === null)
     case 'playing':
+      // 소원 대기 → 그 사람 / 폭탄 예약 → 예약자 / 폭탄 창구 → 특정 턴 없음(타이머가 마감)
+      if (state.awaitingWish !== null) return [state.awaitingWish]
+      if (state.bombClaim !== null) return [state.bombClaim]
+      if (state.pendingClose !== null) return []
       return [state.turn]
     case 'dragonGift':
       return state.pendingDragon ? [state.pendingDragon.winner] : []

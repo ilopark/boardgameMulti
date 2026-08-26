@@ -51,6 +51,12 @@ export interface TichuPlayerView {
   trick: TichuPlay[]
   /** 마작 소원. 아직 이행 안 됨 */
   wish: number | null
+  /** 마작을 내고 **소원을 정하는 중인 좌석** (없으면 null). 이 동안 나머지는 행동 불가 */
+  awaitingWish: number | null
+  /** 트릭이 곧 닫힘 — **폭탄 창구**가 열려 있다 (턴이 아니어도 폭탄 가능) */
+  bombWindow: boolean
+  /** "폭탄 내기"를 예약한 좌석 (진행 정지, 그 좌석이 제출/취소할 때까지). 없으면 null */
+  bombClaim: number | null
 
   /** 그랜드 티츄 단계 — 내가 결정했는지 */
   grandDecided: boolean
@@ -161,6 +167,9 @@ export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
     current: state.current,
     trick: [...state.trick],
     wish: state.wish,
+    awaitingWish: state.awaitingWish,
+    bombWindow: state.pendingClose !== null,
+    bombClaim: state.bombClaim,
     grandDecided: state.grandDecided[seat] ?? false,
     passSubmitted: state.passSelections[seat] !== null,
     received: (state.received[seat] ?? []).map((r) => ({ ...r })),

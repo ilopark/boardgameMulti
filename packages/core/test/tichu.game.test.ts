@@ -5,6 +5,7 @@ import {
   startRound as startRoundForTest,
   makeTichuOptions,
   reduce,
+  mustFulfillWish,
   TichuRuleError,
   waitingSeats,
   type TichuCard,
@@ -132,6 +133,7 @@ describe('패스와 트릭 종료 — 룰북 핵심', () => {
     g = reduce(g, { type: 'pass', seat: 1 }, r)
     g = reduce(g, { type: 'pass', seat: 2 }, r)
     g = reduce(g, { type: 'pass', seat: 3 }, r)
+    g = reduce(g, { type: 'collectTrick' }, r) // 폭탄 창구 마감
     // 0번이 트릭 획득 + 다음 리드
     expect(g.won[0]!.map((x) => x.id)).toContain('jade-5')
     expect(g.leader).toBe(0)
@@ -218,6 +220,7 @@ describe('특수 카드', () => {
     g = reduce(g, { type: 'pass', seat: 1 }, r)
     g = reduce(g, { type: 'pass', seat: 2 }, r)
     g = reduce(g, { type: 'pass', seat: 3 }, r)
+    g = reduce(g, { type: 'collectTrick' }, r) // 폭탄 창구 마감 → 용 넘기기 단계로
     expect(g.phase).toBe('dragonGift')
     expect(g.pendingDragon?.winner).toBe(0)
 
@@ -724,6 +727,7 @@ describe('뷰 마스킹', () => {
     g.leader = 0
     g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
     for (const s of [1, 2, 3]) g = reduce(g, { type: 'pass', seat: s }, r)
+    g = reduce(g, { type: 'collectTrick' }, r) // 폭탄 창구 마감
     for (const s of [0, 1, 2, 3]) expect(viewFor(g, 0).seats[s]!.passed).toBe(false)
   })
 
@@ -743,6 +747,7 @@ describe('뷰 마스킹', () => {
     g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
     g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-13'] }, r)
     for (const s of [2, 3, 0]) g = reduce(g, { type: 'pass', seat: s }, r)
+    g = reduce(g, { type: 'collectTrick' }, r) // 폭탄 창구 마감
     // 1번(팀1)이 5(5점) + K(10점) = 15점을 가져갔다
     const v = viewFor(g, 0)
     expect(v.liveCardPoints).toEqual([0, 15])
@@ -761,6 +766,7 @@ describe('뷰 마스킹', () => {
     g.leader = 0
     g = reduce(g, { type: 'play', seat: 0, cardIds: ['dragon'] }, r)
     for (const s of [1, 2, 3]) g = reduce(g, { type: 'pass', seat: s }, r)
+    g = reduce(g, { type: 'collectTrick' }, r) // 폭탄 창구 마감 → 용 넘기기 단계로
     expect(viewFor(g, 0).dragonTargets).toEqual([1, 3])
     expect(viewFor(g, 1).dragonTargets).toEqual([])
   })
@@ -791,5 +797,213 @@ describe('손패 정렬', () => {
     for (let i = 1; i < hand.length; i++) {
       expect(key(hand[i]!)).toBeGreaterThanOrEqual(key(hand[i - 1]!))
     }
+  })
+})
+
+describe('마작 소원 대기 (새 규칙)', () => {
+  function leadWithMahjong(seed = 7) {
+    const r = createRng(seed)
+    let g = toPlaying(seed)
+    const lead = g.turn
+    setHand(g, lead, [mahjong, c('jade', 7)])
+    g = reduce(g, { type: 'play', seat: lead, cardIds: ['mahjong'] }, r)
+    return { g, r, lead }
+  }
+
+  it('마작을 내면 그 사람이 소원 대기 상태가 된다', () => {
+    const { g, lead } = leadWithMahjong()
+    expect(g.awaitingWish).toBe(lead)
+    expect(waitingSeats(g)).toEqual([lead])
+  })
+
+  it('소원을 정하기 전엔 다른 사람이 내거나 패스할 수 없다', () => {
+    const { g, r, lead } = leadWithMahjong()
+    const other = (lead + 1) % 4
+    expect(() => reduce(g, { type: 'pass', seat: other }, r)).toThrow(TichuRuleError)
+    expect(() => reduce(g, { type: 'play', seat: other, cardIds: ['jade-3'] }, r)).toThrow(TichuRuleError)
+  })
+
+  it('소원을 정하면 대기가 풀리고 다음 사람에게 턴이 넘어간다', () => {
+    const { g, r, lead } = leadWithMahjong()
+    const next = reduce(g, { type: 'wish', seat: lead, rank: 8 }, r)
+    expect(next.awaitingWish).toBeNull()
+    expect(next.wish).toBe(8)
+    expect(next.turn).toBe((lead + 1) % 4)
+  })
+
+  it('소원 없이(null) 넘어갈 수 있다', () => {
+    const { g, r, lead } = leadWithMahjong()
+    const next = reduce(g, { type: 'wish', seat: lead, rank: null }, r)
+    expect(next.awaitingWish).toBeNull()
+    expect(next.wish).toBeNull()
+  })
+
+  it('마작 낸 사람이 아니면 소원을 부를 수 없다', () => {
+    const { g, r, lead } = leadWithMahjong()
+    expect(() => reduce(g, { type: 'wish', seat: (lead + 1) % 4, rank: 5 }, r)).toThrow(TichuRuleError)
+  })
+})
+
+describe('폭탄 창구 (새 규칙)', () => {
+  /** 0번이 단일 카드로 리드하고 1·2·3이 패스한 직전 상태 */
+  function afterThreePass(seed = 7) {
+    const r = createRng(seed)
+    let g = toPlaying(seed)
+    g.turn = 0
+    g.leader = 0
+    g.current = null
+    g.passed = [false, false, false, false]
+    g.trickAction = [null, null, null, null]
+    setHand(g, 0, [c('jade', 7), c('sword', 9)])
+    setHand(g, 1, [c('jade', 3), c('jade', 4)])
+    setHand(g, 2, [c('jade', 9), c('sword', 9), c('pagoda', 9), c('star', 9)]) // 폭탄 보유
+    setHand(g, 3, [c('pagoda', 3), c('pagoda', 4)])
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-7'] }, r)
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    g = reduce(g, { type: 'pass', seat: 2 }, r)
+    g = reduce(g, { type: 'pass', seat: 3 }, r)
+    return { g, r }
+  }
+
+  it('마지막 패스 시 트릭을 바로 닫지 않고 폭탄 창구를 연다', () => {
+    const { g } = afterThreePass()
+    expect(g.pendingClose).toEqual({ winner: 0 })
+    expect(g.current).not.toBeNull() // 트릭은 테이블에 그대로
+    expect(waitingSeats(g)).toEqual([]) // 특정 턴 없음
+  })
+
+  it('창구 중 패스/일반카드는 막히고 collectTrick 로만 마감된다', () => {
+    const { g, r } = afterThreePass()
+    expect(() => reduce(g, { type: 'pass', seat: 0 }, r)).toThrow(TichuRuleError)
+    const done = reduce(g, { type: 'collectTrick' }, r)
+    expect(done.pendingClose).toBeNull()
+    expect(done.current).toBeNull()
+    expect(done.leader).toBe(0) // 이긴 사람이 다음 리드
+    expect(done.won[0]!.some((x) => x.id === 'jade-7')).toBe(true)
+  })
+
+  it('창구 중 폭탄이 들어오면 창구가 취소되고 판이 계속된다', () => {
+    const { g, r } = afterThreePass()
+    const bombed = reduce(
+      g,
+      { type: 'play', seat: 2, cardIds: ['jade-9', 'sword-9', 'pagoda-9', 'star-9'], asBomb: true },
+      r,
+    )
+    expect(bombed.pendingClose).toBeNull()
+    expect(bombed.current?.isBomb).toBe(true)
+  })
+})
+
+describe('폭탄 예약 (폭탄 내기 → 시간 벌기)', () => {
+  /** 0번 단일 리드 + 1·2·3 패스 → pendingClose. 2번이 폭탄(9 four) 보유. */
+  function afterThreePass(seed = 7) {
+    const r = createRng(seed)
+    let g = toPlaying(seed)
+    g.turn = 0; g.leader = 0; g.current = null
+    g.passed = [false, false, false, false]; g.trickAction = [null, null, null, null]
+    setHand(g, 0, [c('jade', 7), c('sword', 9)])
+    setHand(g, 1, [c('jade', 3), c('jade', 4)])
+    setHand(g, 2, [c('jade', 9), c('sword', 9), c('pagoda', 9), c('star', 9)])
+    setHand(g, 3, [c('pagoda', 3), c('pagoda', 4)])
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-7'] }, r)
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    g = reduce(g, { type: 'pass', seat: 2 }, r)
+    g = reduce(g, { type: 'pass', seat: 3 }, r)
+    return { g, r }
+  }
+
+  it('폭탄 예약하면 진행이 멈추고 그 좌석만 기다린다', () => {
+    const { g, r } = afterThreePass()
+    const claimed = reduce(g, { type: 'claimBomb', seat: 2 }, r)
+    expect(claimed.bombClaim).toBe(2)
+    expect(claimed.pendingClose).toEqual({ winner: 0 }) // 아직 안 걷힘
+    expect(waitingSeats(claimed)).toEqual([2])
+  })
+
+  it('예약 중엔 다른 사람이 폭탄도 못 낸다', () => {
+    const { g, r } = afterThreePass()
+    const claimed = reduce(g, { type: 'claimBomb', seat: 2 }, r)
+    // 3번이 (설령 폭탄이 있어도) 낼 수 없다
+    setHand(claimed, 3, [c('jade', 10), c('sword', 10), c('pagoda', 10), c('star', 10)])
+    expect(() =>
+      reduce(claimed, { type: 'play', seat: 3, cardIds: ['jade-10', 'sword-10', 'pagoda-10', 'star-10'], asBomb: true }, r),
+    ).toThrow(TichuRuleError)
+  })
+
+  it('예약자가 폭탄을 제출하면 예약·창구가 풀리고 판이 계속된다', () => {
+    const { g, r } = afterThreePass()
+    let claimed = reduce(g, { type: 'claimBomb', seat: 2 }, r)
+    claimed = reduce(
+      claimed,
+      { type: 'play', seat: 2, cardIds: ['jade-9', 'sword-9', 'pagoda-9', 'star-9'], asBomb: true },
+      r,
+    )
+    expect(claimed.bombClaim).toBeNull()
+    expect(claimed.pendingClose).toBeNull()
+    expect(claimed.current?.isBomb).toBe(true)
+  })
+
+  it('예약 취소(또는 시간초과)하면 트릭이 걷히고 진행된다', () => {
+    const { g, r } = afterThreePass()
+    let claimed = reduce(g, { type: 'claimBomb', seat: 2 }, r)
+    claimed = reduce(claimed, { type: 'cancelBomb', seat: 2 }, r)
+    expect(claimed.bombClaim).toBeNull()
+    expect(claimed.pendingClose).toBeNull()
+    expect(claimed.current).toBeNull() // 트릭이 걷혔다
+    expect(claimed.won[0]!.some((x) => x.id === 'jade-7')).toBe(true) // 0번이 가져감
+  })
+
+  it('예약이 없을 때는 취소할 수 없다', () => {
+    const { g, r } = afterThreePass()
+    expect(() => reduce(g, { type: 'cancelBomb', seat: 2 }, r)).toThrow(TichuRuleError)
+  })
+})
+
+describe('마작 소원 + 폭탄 강제 (룰북 확인)', () => {
+  it('소원 숫자를 낼 방법이 폭탄뿐이면 폭탄(2222)을 강제한다', () => {
+    const r = createRng(7)
+    let g = toPlaying(7)
+    g.turn = 0; g.leader = 0; g.current = null; g.wish = 2
+    g.passed = [false, false, false, false]; g.trickAction = [null, null, null, null]
+    setHand(g, 0, [c('star', 14), c('star', 13)]) // 0번: 소원 카드(2) 없음
+    setHand(g, 1, [c('jade', 2), c('sword', 2), c('pagoda', 2), c('star', 2), c('jade', 9)]) // 2 네장 = 폭탄
+    setHand(g, 2, [c('jade', 5)])
+    setHand(g, 3, [c('jade', 6)])
+    // 0번이 단일 A 리드 (2 하나로는 못 이긴다)
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['star-14'] }, r)
+    expect(g.turn).toBe(1)
+    // 1번은 소원을 반드시 이행해야 하고, 그 방법은 폭탄뿐
+    expect(mustFulfillWish(g, 1)).toBe(true)
+    expect(() => reduce(g, { type: 'pass', seat: 1 }, r)).toThrow(TichuRuleError)
+    expect(() => reduce(g, { type: 'play', seat: 1, cardIds: ['jade-9'] }, r)).toThrow(TichuRuleError)
+    // 폭탄 2222 는 허용되고 소원이 풀린다
+    const played = reduce(
+      g,
+      { type: 'play', seat: 1, cardIds: ['jade-2', 'sword-2', 'pagoda-2', 'star-2'], asBomb: true },
+      r,
+    )
+    expect(played.wish).toBeNull()
+    expect(played.current?.isBomb).toBe(true)
+  })
+
+  it('단일로도 소원을 낼 수 있으면 폭탄까지 강제하지 않는다', () => {
+    const r = createRng(7)
+    let g = toPlaying(7)
+    g.turn = 0; g.leader = 0; g.current = null; g.wish = 2
+    g.passed = [false, false, false, false]; g.trickAction = [null, null, null, null]
+    setHand(g, 0, [mahjong, c('star', 13)]) // 0번: 마작(1) 단일 리드
+    setHand(g, 1, [c('jade', 2), c('sword', 2), c('pagoda', 2), c('star', 2), c('jade', 9)])
+    setHand(g, 2, [c('jade', 5)])
+    setHand(g, 3, [c('jade', 6)])
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['mahjong'] }, r)
+    // 마작을 냈으니 소원 대기 → 소원을 2로 지정
+    g = reduce(g, { type: 'wish', seat: 0, rank: 2 }, r)
+    expect(g.turn).toBe(1)
+    expect(mustFulfillWish(g, 1)).toBe(true)
+    // 단일 2 로 마작(1)을 이길 수 있다 → 폭탄 안 깨고 단일 2 허용
+    const played = reduce(g, { type: 'play', seat: 1, cardIds: ['jade-2'] }, r)
+    expect(played.wish).toBeNull()
+    expect(played.current?.isBomb).toBe(false)
+    expect(played.hands[1]!.filter((x) => x.kind === 'number' && x.rank === 2)).toHaveLength(3) // 세 장 남음
   })
 })

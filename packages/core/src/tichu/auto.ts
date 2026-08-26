@@ -10,6 +10,11 @@ import { teamOf, type TichuCard } from './types.js'
  * 티츄는 선언하지 않고, 낼 수 있으면 제일 약한 걸 내고, 패스할 수 있으면 패스한다.
  */
 export function autoAction(state: TichuGameState, seat: number): TichuAction | null {
+  // 마작을 낸 봇은 소원을 부르지 않는다 (대기를 풀어 판을 계속 굴린다)
+  if (state.awaitingWish === seat) return { type: 'wish', seat, rank: null }
+  // 폭탄 창구·예약 중에는 봇은 아무것도 하지 않는다 (서버 타이머가 처리)
+  if (state.pendingClose !== null || state.bombClaim !== null) return null
+
   switch (state.phase) {
     case 'grandTichu':
       return { type: 'grandTichu', seat, call: false }

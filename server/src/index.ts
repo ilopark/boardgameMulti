@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import sirv from 'sirv'
 import { Server, type Socket } from 'socket.io'
-import { randomInt } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import {
   createRng,
   hashSeed,
@@ -19,6 +19,7 @@ import {
   type ServerToClient,
 } from '@bg/core'
 import {
+  addBot,
   addPlayer,
   applySeatArrangement,
   compactSeats,
@@ -142,6 +143,27 @@ function clearTurnTimer(room: Room): void {
  */
 function scheduleTurnTimeout(room: Room): void {
   clearTurnTimer(room)
+
+  // 티츄 특수 대기: 소원(10초) · 폭탄 창구(3초)는 별도 타이머로 마감한다
+  const tg = room.tichuGame
+  if (tg) {
+    if (tg.awaitingWish !== null) {
+      room.turnDeadline = Date.now() + TURN_POLICY.wishMs
+      room.turnTimer = setTimeout(() => handleWishTimeout(room), TURN_POLICY.wishMs)
+      return
+    }
+    if (tg.bombClaim !== null) {
+      room.turnDeadline = Date.now() + TURN_POLICY.bombClaimMs
+      room.turnTimer = setTimeout(() => handleBombClaimTimeout(room), TURN_POLICY.bombClaimMs)
+      return
+    }
+    if (tg.pendingClose !== null) {
+      room.turnDeadline = Date.now() + TURN_POLICY.bombWindowMs
+      room.turnTimer = setTimeout(() => handleBombWindowTimeout(room), TURN_POLICY.bombWindowMs)
+      return
+    }
+  }
+
   const phase = currentPhase(room)
   if (phase === null) return
 
@@ -158,6 +180,49 @@ function scheduleTurnTimeout(room: Room): void {
 
   room.turnDeadline = Date.now() + limit
   room.turnTimer = setTimeout(() => handleTurnTimeout(room), limit)
+}
+
+/** 소원 대기 시간 초과 — 소원 없음으로 처리하고 판을 계속 굴린다 */
+function handleWishTimeout(room: Room): void {
+  const game = room.tichuGame
+  if (!game || !room.rng || game.awaitingWish === null) return
+  try {
+    room.tichuGame = tichu.reduce(game, { type: 'wish', seat: game.awaitingWish, rank: null }, room.rng)
+    console.log(`[시간초과] ${room.code} 티츄 소원 미선택 → 소원 없음`)
+  } catch (e) {
+    console.error('[소원 시간초과 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
+}
+
+/** 폭탄 창구 종료 — 트릭을 실제로 걷어간다. 트릭이 바뀌므로 트릭 패스도 초기화. */
+function handleBombWindowTimeout(room: Room): void {
+  const game = room.tichuGame
+  if (!game || !room.rng || game.pendingClose === null) return
+  try {
+    room.tichuGame = tichu.reduce(game, { type: 'collectTrick' }, room.rng)
+    room.tichuAutoPass = [false, false, false, false] // 트릭 패스는 트릭마다 초기화
+  } catch (e) {
+    console.error('[폭탄 창구 종료 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
+}
+
+/** 폭탄 예약 시간 초과 — 예약을 취소하고 트릭을 걷어간다 */
+function handleBombClaimTimeout(room: Room): void {
+  const game = room.tichuGame
+  if (!game || !room.rng || game.bombClaim === null) return
+  try {
+    room.tichuGame = tichu.reduce(game, { type: 'cancelBomb', seat: game.bombClaim }, room.rng)
+    room.tichuAutoPass = [false, false, false, false] // 트릭이 걷혔으므로 트릭 패스 초기화
+    console.log(`[시간초과] ${room.code} 티츄 폭탄 예약 미제출 → 취소`)
+  } catch (e) {
+    console.error('[폭탄 예약 시간초과 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
 }
 
 /** 시간 초과 — 대신 행동하고 계속 진행한다 */
@@ -178,16 +243,19 @@ function handleTurnTimeout(room: Room): void {
     } else if (game.phase === 'playing') {
       const seat = skullking.currentSeat(game)
       if (seat === null) return
-      const pick = skullking.pickWeakestLegal(game, seat)
+      // 낼 수 있는 카드 중 손패 **가장 왼쪽**(화면 정렬 순서 기준) 카드를 낸다
+      const legalIds = new Set(skullking.legalFor(game, seat).map((c) => c.id))
+      if (legalIds.size === 0) return
+      const sorted = skullking.sortHand(game.hands[seat] ?? [])
+      const pick = sorted.find((c) => legalIds.has(c.id))
       if (!pick) return
-      room.skGame = skullking.reduce(
-        game,
-        pick.tigressAs
-          ? { type: 'play', seat, cardId: pick.card.id, tigressAs: pick.tigressAs }
-          : { type: 'play', seat, cardId: pick.card.id },
-        room.rng,
-      )
-      console.log(`[시간초과] ${room.code} ${seat}번 자동 제출 ${pick.card.id}`)
+      // 티그리스가 가장 왼쪽이면 도주로 낸다(자리 비운 사람이 얻어걸려 트릭 먹는 걸 피함)
+      const action =
+        pick.kind === 'tigress'
+          ? ({ type: 'play', seat, cardId: pick.id, tigressAs: 'escape' } as const)
+          : ({ type: 'play', seat, cardId: pick.id } as const)
+      room.skGame = skullking.reduce(game, action, room.rng)
+      console.log(`[시간초과] ${room.code} ${seat}번 자동 제출(가장 왼쪽) ${pick.id}`)
     }
   } catch (e) {
     console.error('[시간초과 처리 실패]', e)
@@ -228,6 +296,8 @@ function runTichuAutoPass(room: Room): void {
   for (let guard = 0; guard < 16; guard++) {
     const game = room.tichuGame
     if (!game || game.phase !== 'playing') return
+    // 소원 대기·폭탄 창구·폭탄 예약 중에는 패스 자체가 막혀 있다 → 자동 패스도 멈춘다
+    if (game.awaitingWish !== null || game.pendingClose !== null || game.bombClaim !== null) return
     const seat = game.turn
     if (!room.tichuAutoPass[seat]) return
     // 리드는 반드시 내야 하고, 소원도 이행해야 한다 → 자동 패스를 끈다
@@ -244,6 +314,85 @@ function runTichuAutoPass(room: Room): void {
   }
 }
 
+function clearBotTimer(room: Room): void {
+  if (room.botTimer) {
+    clearTimeout(room.botTimer)
+    room.botTimer = null
+  }
+}
+
+/** 그 게임 좌석에 앉은 봇 (없으면 undefined) */
+function botAtSeat(room: Room, seat: number) {
+  for (const p of room.players.values()) if (p.seat === seat && p.isBot) return p
+  return undefined
+}
+
+/** 지금 행동을 기다리는 좌석들 */
+function waitingSeatsOf(room: Room): number[] {
+  if (room.skGame) return skullking.waitingSeats(room.skGame)
+  if (room.tichuGame) return tichu.waitingSeats(room.tichuGame)
+  return []
+}
+
+/** 봇 차례가 하나라도 있으면 잠깐 뒤에 대신 행동하도록 예약한다 */
+function scheduleBots(room: Room): void {
+  if (room.botTimer) return // 이미 예약돼 있다
+  const phase = currentPhase(room)
+  if (phase === null || phase === 'trickEnd' || phase === 'roundEnd' || phase === 'gameEnd') return
+  const hasBotTurn = waitingSeatsOf(room).some((seat) => botAtSeat(room, seat))
+  if (!hasBotTurn) return
+  // 사람처럼 잠깐 생각하는 척. 카드 내는 건 조금 더 뜸을 들인다.
+  const delay = phase === 'playing' ? 900 : 700
+  room.botTimer = setTimeout(() => {
+    room.botTimer = null
+    stepBots(room)
+  }, delay)
+}
+
+/**
+ * 기다리는 봇 좌석 중 하나를 대신 처리한다.
+ * 한 번에 하나만 처리하고 afterGameChange로 다시 예약해서,
+ * 여러 봇이 있어도 한 명씩 차례로 두는 것처럼 보이게 한다.
+ */
+function stepBots(room: Room): void {
+  if (!room.rng) return
+  const waiting = waitingSeatsOf(room)
+  const seat = waiting.find((s) => botAtSeat(room, s))
+  if (seat === undefined) return
+  try {
+    if (room.skGame) {
+      const game = room.skGame
+      if (game.phase === 'bidding') {
+        // 0~카드수 사이 무작위 입찰 (자동 처리의 무조건 0보다 판이 재밌다)
+        const value = randomInt(0, skullking.maxBid(game) + 1)
+        room.skGame = skullking.reduce(game, { type: 'bid', seat, value }, room.rng)
+      } else if (game.phase === 'playing') {
+        const pick = skullking.pickWeakestLegal(game, seat)
+        if (!pick) return
+        room.skGame = skullking.reduce(
+          game,
+          pick.tigressAs
+            ? { type: 'play', seat, cardId: pick.card.id, tigressAs: pick.tigressAs }
+            : { type: 'play', seat, cardId: pick.card.id },
+          room.rng,
+        )
+      } else {
+        return
+      }
+    } else if (room.tichuGame) {
+      const action = tichu.autoAction(room.tichuGame, seat)
+      if (!action) return
+      room.tichuGame = tichu.reduce(room.tichuGame, action, room.rng)
+    } else {
+      return
+    }
+  } catch (e) {
+    console.error('[봇 처리 실패]', e)
+    return
+  }
+  afterGameChange(room)
+}
+
 /**
  * 게임 상태가 바뀐 뒤 공통 처리.
  * **타이머를 먼저 세팅하고 그 다음에 뷰를 보낸다** — 순서가 반대면
@@ -257,6 +406,7 @@ function afterGameChange(room: Room): void {
   }
   scheduleTurnTimeout(room)
   scheduleAdvance(room)
+  scheduleBots(room)
   broadcastGame(room)
 }
 
@@ -308,6 +458,7 @@ function scheduleAdvance(room: Room): void {
 function resetToLobby(room: Room): void {
   clearAdvanceTimer(room)
   clearTurnTimer(room)
+  clearBotTimer(room)
   room.skGame = null
   room.tichuGame = null
   room.seatArrangement = null
@@ -315,7 +466,8 @@ function resetToLobby(room: Room): void {
   room.rng = null
   room.dealerSeat = null
   room.phase = 'lobby'
-  for (const p of room.players.values()) p.ready = false
+  // 봇은 늘 준비 상태를 유지한다 (사람만 초기화)
+  for (const p of room.players.values()) p.ready = p.isBot
 }
 
 function isValidNickname(nickname: unknown): nickname is string {
@@ -433,8 +585,8 @@ io.on('connection', (socket) => {
     if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 설정을 바꿀 수 있습니다.' })
     if (room.phase !== 'lobby') return cb({ ok: false, error: '게임 중에는 설정을 바꿀 수 없습니다.' })
     room.options = { ...room.options, ...options }
-    // 설정이 바뀌면 준비 상태를 초기화한다 (모르고 시작하는 걸 막기 위해)
-    for (const p of room.players.values()) p.ready = false
+    // 설정이 바뀌면 준비 상태를 초기화한다 (모르고 시작하는 걸 막기 위해). 봇은 늘 준비.
+    for (const p of room.players.values()) p.ready = p.isBot
     cb({ ok: true })
     broadcast(room)
   })
@@ -614,6 +766,14 @@ io.on('connection', (socket) => {
     withTichu(cb, (seat) => ({ type: 'pass', seat }))
   })
 
+  socket.on('tichu:claimBomb', (_p, cb) => {
+    withTichu(cb, (seat) => ({ type: 'claimBomb', seat }))
+  })
+
+  socket.on('tichu:cancelBomb', (_p, cb) => {
+    withTichu(cb, (seat) => ({ type: 'cancelBomb', seat }))
+  })
+
   socket.on('tichu:autopass', ({ on }, cb) => {
     const ctx = currentRoomAndPlayer(socket)
     if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
@@ -657,6 +817,51 @@ io.on('connection', (socket) => {
     broadcast(room)
   })
 
+  socket.on('room:addBot', (_p, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 봇을 추가할 수 있습니다.' })
+    if (room.phase !== 'lobby') return cb({ ok: false, error: '게임 중에는 봇을 추가할 수 없습니다.' })
+    const bot = addBot(room)
+    if (!bot) return cb({ ok: false, error: '빈자리가 없습니다.' })
+    cb({ ok: true })
+    broadcast(room)
+    console.log(`[봇 추가] ${room.code} ${bot.nickname} (${bot.seat! + 1}번)`)
+  })
+
+  socket.on('room:removeBot', ({ playerId }, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 봇을 내보낼 수 있습니다.' })
+    if (room.phase !== 'lobby') return cb({ ok: false, error: '게임 중에는 봇을 내보낼 수 없습니다.' })
+    const bot = room.players.get(playerId)
+    if (!bot || !bot.isBot) return cb({ ok: false, error: '봇이 아닙니다.' })
+    room.players.delete(playerId)
+    cb({ ok: true })
+    broadcast(room)
+  })
+
+  socket.on('chat:send', ({ text }, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (typeof text !== 'string') return cb({ ok: false, error: '메시지가 올바르지 않습니다.' })
+    const trimmed = text.replace(/\s+$/g, '').slice(0, 300).trim()
+    if (trimmed.length === 0) return cb({ ok: false, error: '빈 메시지는 보낼 수 없습니다.' })
+    cb({ ok: true })
+    // **같은 방 소켓에게만** 보낸다 (io.to(방코드)). 다른 방으로는 절대 나가지 않는다.
+    io.to(room.code).emit('chat:message', {
+      id: randomUUID(),
+      playerId: player.id,
+      nickname: player.nickname,
+      seat: player.seat,
+      text: trimmed,
+      ts: Date.now(),
+    })
+  })
+
   socket.on('room:leave', (_p, cb) => {
     const ctx = currentRoomAndPlayer(socket)
     if (!ctx) return cb({ ok: true })
@@ -673,7 +878,9 @@ io.on('connection', (socket) => {
     socket.data.roomCode = undefined as unknown as string
     socket.data.playerId = undefined as unknown as string
     cb({ ok: true })
-    if (room.players.size === 0) deleteRoom(room.code)
+    // 사람이 아무도 안 남으면(봇만 남아도) 방을 정리한다
+    const anyHuman = [...room.players.values()].some((p) => !p.isBot)
+    if (!anyHuman) deleteRoom(room.code)
     else broadcast(room)
   })
 

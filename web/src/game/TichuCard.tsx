@@ -26,11 +26,12 @@ const SUIT_FILE: Record<string, string> = {
   star: 'D', // 별 → 다이아
 }
 
+// 툴팁은 실제로 그려진 트럼프 문양으로 보여준다 (검→스페이드, 탑→하트, 옥→클로버, 별→다이아)
 const SUIT_LABEL: Record<string, string> = {
-  sword: '검',
-  jade: '옥',
-  pagoda: '탑',
-  star: '별',
+  sword: '스페이드',
+  jade: '클로버',
+  pagoda: '하트',
+  star: '다이아',
 }
 
 const RANK_FILE: Record<number, string> = {

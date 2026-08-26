@@ -21,7 +21,6 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
   const [busy, setBusy] = useState(false)
   const [picked, setPicked] = useState<string[]>([])
   const [phoenixChoices, setPhoenixChoices] = useState<tichu.Combo[] | null>(null)
-  const [wishOpen, setWishOpen] = useState(false)
 
   // 단계가 바뀌거나 테이블이 갱신되면 선택을 비운다
   useEffect(() => {
@@ -48,6 +47,10 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
   }
 
   const myTurn = view.turn === view.seat && view.phase === 'playing'
+  // 폭탄 창구/예약 상태
+  const inBombWindow = view.bombWindow && view.bombClaim === null // 3초 창구, 아직 예약 없음
+  const iClaimedBomb = view.bombClaim === view.seat // 내가 예약 → 폭탄 제출 시간
+  const otherClaimedBomb = view.bombClaim !== null && view.bombClaim !== view.seat
   const pickedCards = view.hand.filter((c) => picked.includes(c.id))
   // 봉황을 단독으로 낼 때는 값이 테이블에서 정해진다 (직전 카드 + 0.5).
   // 서버와 같은 계산을 써야 "낼 수 있는데 못 낸다"고 표시되지 않는다.
@@ -71,8 +74,7 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
     void run(() => request('tichu:play', payload)).then(() => {
       setPicked([])
       setPhoenixChoices(null)
-      // 마작을 냈으면 소원을 부를 수 있다
-      if (pickedCards.some((c) => c.kind === 'mahjong')) setWishOpen(true)
+      // 마작을 내면 서버가 '소원 대기' 상태로 바꾼다 → view.awaitingWish 로 모달이 열린다
     })
   }
 
@@ -103,14 +105,39 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
 
       {autoPass && view.phase === 'playing' && (
         <p className="autopassbar">
-          <strong>전체 패스 켜짐</strong> — 내 차례가 오면 자동으로 패스합니다.
-          리드하거나 마작 소원을 이행해야 하면 자동으로 풀립니다.
+          <strong>트릭 패스 켜짐</strong> — 이번 트릭 동안 내 차례가 오면 자동으로 패스합니다.
+          트릭이 끝나면 풀립니다. 리드하거나 마작 소원을 이행해야 하면 자동으로 풀립니다.
         </p>
       )}
 
       {view.wish !== null && (
+        <div className="wishpin" role="status" aria-label={`마작 소원 ${rankLabel(view.wish)}`}>
+          <span className="wishpin__icon">🀄</span>
+          <span className="wishpin__label">마작 소원</span>
+          <strong className="wishpin__rank">{rankLabel(view.wish)}</strong>
+          <span className="wishpin__hint">낼 수 있으면 반드시 내야 함</span>
+        </div>
+      )}
+
+      {view.awaitingWish !== null && view.awaitingWish !== view.seat && (
         <p className="wishbar">
-          마작 소원: <strong>{rankLabel(view.wish)}</strong> — 낼 수 있으면 반드시 내야 합니다
+          <strong>{nameOf(view.awaitingWish)}</strong>님이 소원을 정하는 중입니다… 잠시만 기다려주세요.
+        </p>
+      )}
+
+      {inBombWindow && (
+        <p className="bombbar">
+          <strong>폭탄 창구</strong> — 폭탄이 있으면 아래 <strong>"폭탄 내기"</strong>를 누르세요. 진행이 멈추고 시간을 드립니다.
+        </p>
+      )}
+      {iClaimedBomb && (
+        <p className="bombbar">
+          <strong>폭탄 준비</strong> — 던질 폭탄을 골라 <strong>"폭탄 투척"</strong>하세요. 시간 안에 안 내면 취소됩니다.
+        </p>
+      )}
+      {otherClaimedBomb && (
+        <p className="bombbar">
+          <strong>{nameOf(view.bombClaim!)}</strong>님이 폭탄을 준비 중입니다 — 진행이 잠시 멈춥니다.
         </p>
       )}
 
@@ -170,7 +197,25 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
           {view.phase === 'playing' && (
             <div className="playbar">
               <span className="playbar__info">
-                {picked.length === 0 ? (
+                {otherClaimedBomb ? (
+                  <>
+                    <strong>{nameOf(view.bombClaim!)}</strong>님이 폭탄을 준비 중… 잠시만요.
+                  </>
+                ) : iClaimedBomb ? (
+                  picked.length === 0 ? (
+                    '던질 폭탄을 고르세요 (같은 숫자 4장 / 같은 색 연속 5장+)'
+                  ) : combo?.isBomb ? (
+                    <>
+                      <strong>{tichu.describeCombo(combo)}</strong>
+                      <span className="playbar__bomb"> 폭탄!</span>
+                      {!canBeatNow && <span className="playbar__warn"> — 이길 수 없습니다</span>}
+                    </>
+                  ) : (
+                    <span className="playbar__warn">폭탄이 아닙니다</span>
+                  )
+                ) : inBombWindow ? (
+                  '폭탄이 있으면 "폭탄 내기"를 누르세요 — 진행이 멈추고 시간을 드립니다'
+                ) : picked.length === 0 ? (
                   '카드를 골라주세요'
                 ) : combo ? (
                   <>
@@ -183,35 +228,73 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
                 )}
               </span>
               <div className="playbar__btns">
-                <button
-                  type="button"
-                  className={combo?.isBomb ? 'bombbtn' : 'primary'}
-                  disabled={busy || !combo || !canBeatNow}
-                  onClick={() => submitPlay()}
-                >
-                  {combo?.isBomb ? '폭탄 투척' : '내기'}
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy || !myTurn || view.current === null}
-                  onClick={() => void run(() => request('tichu:pass', {}))}
-                >
-                  패스
-                </button>
-                <button
-                  type="button"
-                  className={autoPass ? 'autopass autopass--on' : 'autopass'}
-                  disabled={busy}
-                  title="이번 라운드 동안 자동으로 패스합니다. 리드하거나 소원을 이행해야 하면 자동으로 풀립니다."
-                  onClick={() => void run(() => request('tichu:autopass', { on: !autoPass }))}
-                >
-                  {autoPass ? '전체 패스 끄기' : '전체 패스'}
-                </button>
-                {picked.length > 0 && (
-                  <button type="button" className="ghost" onClick={() => setPicked([])}>
-                    선택 해제
+                {otherClaimedBomb ? null : iClaimedBomb ? (
+                  <>
+                    <button
+                      type="button"
+                      className="bombbtn"
+                      disabled={busy || !combo || !combo.isBomb || !canBeatNow}
+                      onClick={() => submitPlay()}
+                    >
+                      폭탄 투척
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={busy}
+                      onClick={() => void run(() => request('tichu:cancelBomb', {}))}
+                    >
+                      취소
+                    </button>
+                    {picked.length > 0 && (
+                      <button type="button" className="ghost" onClick={() => setPicked([])}>
+                        선택 해제
+                      </button>
+                    )}
+                  </>
+                ) : inBombWindow ? (
+                  <button
+                    type="button"
+                    className="bombbtn"
+                    disabled={busy || view.hand.length === 0}
+                    title={view.hand.length === 0 ? '이미 손패를 다 냈습니다' : undefined}
+                    onClick={() => void run(() => request('tichu:claimBomb', {}))}
+                  >
+                    폭탄 내기
                   </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={combo?.isBomb ? 'bombbtn' : 'primary'}
+                      disabled={busy || !combo || !canBeatNow}
+                      onClick={() => submitPlay()}
+                    >
+                      {combo?.isBomb ? '폭탄 투척' : '내기'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy || !myTurn || view.current === null}
+                      onClick={() => void run(() => request('tichu:pass', {}))}
+                    >
+                      패스
+                    </button>
+                    <button
+                      type="button"
+                      className={autoPass ? 'autopass autopass--on' : 'autopass'}
+                      disabled={busy}
+                      title="이번 트릭 동안 내 차례가 오면 자동으로 패스합니다. 트릭이 끝나면 풀립니다. 리드하거나 소원을 이행해야 하면 자동으로 풀립니다."
+                      onClick={() => void run(() => request('tichu:autopass', { on: !autoPass }))}
+                    >
+                      {autoPass ? '트릭 패스 끄기' : '트릭 패스'}
+                    </button>
+                    {picked.length > 0 && (
+                      <button type="button" className="ghost" onClick={() => setPicked([])}>
+                        선택 해제
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -244,12 +327,10 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
         </div>
       )}
 
-      {wishOpen && (
+      {view.awaitingWish === view.seat && (
         <WishModal
           busy={busy}
-          onPick={(rank) =>
-            void run(() => request('tichu:wish', { rank })).then(() => setWishOpen(false))
-          }
+          onPick={(rank) => void run(() => request('tichu:wish', { rank }))}
         />
       )}
 

@@ -99,6 +99,25 @@ describe('폭탄', () => {
     const fh = parseCombo([c('jade', 14), c('star', 14), c('sword', 14), c('jade', 13), c('star', 13)])!
     expect(canBeat(bomb, fh)).toBe(true)
   })
+
+  it('높은 포카드가 낮은 포카드를 이긴다 (3333 → 4444 → 5555 계속 가능)', () => {
+    const four = (r: number) =>
+      parseCombo([c('jade', r), c('star', r), c('sword', r), c('pagoda', r)])!
+    expect(canBeat(four(4), four(3))).toBe(true) // 4444 > 3333
+    expect(canBeat(four(5), four(4))).toBe(true) // 5555 > 4444
+    expect(canBeat(four(3), four(4))).toBe(false) // 낮은 폭탄은 못 이김
+    expect(canBeat(four(4), four(4))).toBe(false) // 같은 값은 못 이김
+  })
+
+  it('스트레이트 플러시는 길이가 길수록 강하고, 같은 길이면 값이 높은 쪽', () => {
+    const sf = (suit: 'jade' | 'star', from: number, len: number) =>
+      parseCombo(Array.from({ length: len }, (_, i) => c(suit, from + i)))!
+    // 6장이 5장을 이긴다 (값 무관)
+    expect(canBeat(sf('jade', 3, 6), sf('star', 9, 5))).toBe(true)
+    // 같은 길이(5)면 값 높은 쪽
+    expect(canBeat(sf('jade', 9, 5), sf('star', 3, 5))).toBe(true)
+    expect(canBeat(sf('star', 3, 5), sf('jade', 9, 5))).toBe(false)
+  })
 })
 
 describe('특수카드', () => {
