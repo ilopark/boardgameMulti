@@ -17,6 +17,7 @@ export default function Chat({ messages, myId, onSend }: Props) {
   const [sending, setSending] = useState(false)
   const [seenCount, setSeenCount] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // 열려 있으면 새 메시지를 읽은 것으로 처리하고 맨 아래로 스크롤
   useEffect(() => {
@@ -26,6 +27,11 @@ export default function Chat({ messages, myId, onSend }: Props) {
       if (el) el.scrollTop = el.scrollHeight
     }
   }, [messages, open])
+
+  // 채팅창을 열면 바로 입력할 수 있게 포커스를 준다
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
 
   const unread = open ? 0 : Math.max(0, messages.length - seenCount)
 
@@ -38,6 +44,8 @@ export default function Chat({ messages, myId, onSend }: Props) {
       setText('')
     } finally {
       setSending(false)
+      // 보내고 나서도 계속 입력할 수 있게 포커스를 입력창에 되돌린다
+      inputRef.current?.focus()
     }
   }
 
@@ -74,11 +82,11 @@ export default function Chat({ messages, myId, onSend }: Props) {
 
       <div className="chat__input">
         <input
+          ref={inputRef}
           type="text"
           value={text}
           maxLength={300}
           placeholder="메시지 입력…"
-          disabled={sending}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
