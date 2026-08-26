@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TURN_POLICY, tichu, type RoomPublic } from '@bg/core'
 import { request } from '../socket.js'
 import Countdown from './Countdown.js'
@@ -303,28 +303,12 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
       )}
 
       {phoenixChoices && (
-        <div className="modal" role="dialog">
-          <div className="modal__box">
-            <h2>봉황을 몇으로 쓸까요?</h2>
-            <p className="muted">해석이 여러 개라 골라야 합니다.</p>
-            <div className="modal__actions">
-              {phoenixChoices.map((opt) => (
-                <button
-                  key={`${opt.type}-${opt.rank}`}
-                  type="button"
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => submitPlay(opt.phoenixAs)}
-                >
-                  {tichu.describeCombo(opt)}
-                </button>
-              ))}
-              <button type="button" className="ghost" onClick={() => setPhoenixChoices(null)}>
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
+        <PhoenixModal
+          options={phoenixChoices}
+          busy={busy}
+          onPick={(as) => submitPlay(as)}
+          onCancel={() => setPhoenixChoices(null)}
+        />
       )}
 
       {view.awaitingWish === view.seat && (
@@ -676,6 +660,62 @@ function DragonPanel({
         ))}
       </div>
     </section>
+  )
+}
+
+/** 봉황 해석 선택 — 10초 안에 안 고르면 맨 위(첫) 옵션으로 자동 결정 */
+function PhoenixModal({
+  options,
+  busy,
+  onPick,
+  onCancel,
+}: {
+  options: tichu.Combo[]
+  busy: boolean
+  onPick: (phoenixAs: number) => void
+  onCancel: () => void
+}) {
+  const [left, setLeft] = useState(10)
+  const onPickRef = useRef(onPick)
+  onPickRef.current = onPick
+  const firstAs = options[0]?.phoenixAs
+  useEffect(() => {
+    const deadline = Date.now() + 10_000
+    const id = setInterval(() => {
+      setLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+      if (deadline - Date.now() <= 0) {
+        clearInterval(id)
+        if (firstAs !== undefined) onPickRef.current(firstAs)
+      }
+    }, 200)
+    return () => clearInterval(id)
+  }, [firstAs])
+
+  return (
+    <div className="modal" role="dialog">
+      <div className="modal__box">
+        <h2>
+          봉황을 몇으로 쓸까요? <span className="tigress__timer">{left}초</span>
+        </h2>
+        <p className="muted">해석이 여러 개라 골라야 합니다. 시간이 지나면 맨 위 선택으로 자동 결정됩니다.</p>
+        <div className="modal__actions">
+          {options.map((opt) => (
+            <button
+              key={`${opt.type}-${opt.rank}`}
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => opt.phoenixAs !== undefined && onPick(opt.phoenixAs)}
+            >
+              {tichu.describeCombo(opt)}
+            </button>
+          ))}
+          <button type="button" className="ghost" onClick={onCancel}>
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -188,9 +188,20 @@ const TYPE_LABEL: Record<ComboType, string> = {
   dog: '개',
 }
 
+/** 값 표기 — 11~14는 J·Q·K·A 로 (숫자 그대로 쓰지 않는다) */
+function rankName(rank: number): string {
+  switch (rank) {
+    case 11: return 'J'
+    case 12: return 'Q'
+    case 13: return 'K'
+    case 14: return 'A'
+    default: return String(rank)
+  }
+}
+
 export function describeCombo(combo: Combo): string {
-  const base = `${TYPE_LABEL[combo.type]} ${combo.length}장 (값 ${combo.rank})`
-  return combo.phoenixAs !== undefined ? `${base} · 봉황=${combo.phoenixAs}` : base
+  const base = `${TYPE_LABEL[combo.type]} ${combo.length}장 (값 ${rankName(combo.rank)})`
+  return combo.phoenixAs !== undefined ? `${base} · 봉황=${rankName(combo.phoenixAs)}` : base
 }
 
 /**
