@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRng } from '../src/common/rng.js'
 import {
   createGame,
+  startRound as startRoundForTest,
   makeTichuOptions,
   reduce,
   TichuRuleError,
@@ -333,6 +334,239 @@ describe('대기 좌석', () => {
   })
 })
 
+describe('교환 기록', () => {
+  it('누가 나에게 뭘 줬는지 기록된다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = newGame()
+    for (let s = 0; s < 4; s++) g = reduce(g, { type: 'grandTichu', seat: s, call: false }, r)
+
+    // 각자 자기 손패 앞 3장을 넘긴다. 넘긴 카드를 미리 기억해 둔다.
+    const sent: Record<number, string[]> = {}
+    for (let s = 0; s < 4; s++) {
+      const ids = g.hands[s]!.slice(0, 3).map((c) => c.id) as [string, string, string]
+      sent[s] = ids
+      g = reduce(g, { type: 'pass3', seat: s, cardIds: ids }, r)
+    }
+
+    for (let seat = 0; seat < 4; seat++) {
+      const v = viewFor(g, seat)
+      expect(v.received).toHaveLength(3)
+      // 준 사람 3명이 모두 다르고, 나 자신은 없다
+      const froms = v.received.map((x) => x.from).sort()
+      expect(froms).toEqual([0, 1, 2, 3].filter((x) => x !== seat))
+      // 실제로 그 사람이 보낸 카드가 맞는지
+      for (const { from, card } of v.received) {
+        expect(sent[from]).toContain(card.id)
+      }
+      // 받은 카드는 내 손에 들어와 있다
+      for (const { card } of v.received) {
+        expect(v.hand.some((c) => c.id === card.id)).toBe(true)
+      }
+    }
+  })
+
+  it('남이 받은 카드는 안 보인다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const g = toPlaying()
+    const mine = viewFor(g, 0)
+    const others = viewFor(g, 1)
+    // 각자 자기 것만 본다
+    expect(mine.received.every((x) => x.from !== 0)).toBe(true)
+    expect(others.received.every((x) => x.from !== 1)).toBe(true)
+    const json = JSON.stringify(mine)
+    // 1번이 받은 카드 중 내가 준 게 아닌 것은 내 뷰에 없어야 한다
+    for (const { from, card } of others.received) {
+      if (from === 0) continue
+      expect(json.includes(`"${card.id}"`)).toBe(false)
+    }
+  })
+
+  it('라운드가 바뀌면 기록도 새로 쌓인다', async () => {
+    const r = rng()
+    let g = toPlaying()
+    expect(g.received[0]).toHaveLength(3)
+    startRoundForTest(g, r)
+    expect(g.received[0]).toHaveLength(0)
+  })
+})
+
+describe('개 카드 표시', () => {
+  it('개를 내면 그 자리에 개 카드가 남는다 (트릭은 안 생기지만)', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [dog, c('jade', 5)])
+    setHand(g, 2, [c('pagoda', 11)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['dog'] }, r)
+
+    // 트릭 자체는 비어 있다
+    expect(g.trick).toHaveLength(0)
+    expect(g.current).toBeNull()
+    // 하지만 화면에는 개가 보여야 한다
+    const v = viewFor(g, 1)
+    expect(v.seats[0]!.playedDog).toBe(true)
+    expect(v.seats[0]!.played?.type).toBe('dog')
+    expect(v.seats[0]!.played?.cards[0]!.kind).toBe('dog')
+  })
+
+  it('다음 트릭이 끝나면 개 표시가 사라진다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [dog, c('jade', 5)])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['dog'] }, r)
+    expect(viewFor(g, 1).seats[0]!.playedDog).toBe(true)
+
+    // 파트너(2번)가 리드하고 트릭이 끝나면 초기화
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    for (const s of [3, 0, 1]) g = reduce(g, { type: 'pass', seat: s }, r)
+    expect(viewFor(g, 1).seats[0]!.playedDog).toBe(false)
+  })
+
+  it('개를 낸 사람이 그 뒤에 카드를 내면 그게 우선 표시된다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [dog, c('jade', 5)])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['dog'] }, r)
+    // 파트너가 리드 → 3, 0 순서로 진행
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    g = reduce(g, { type: 'pass', seat: 3 }, r)
+    // 0번이 낼 수 있는 게 없으니 패스. 개 표시는 유지
+    expect(viewFor(g, 1).seats[0]!.playedDog).toBe(true)
+  })
+})
+
+describe('라운드 종료 시점', () => {
+  it('3명이 나가면 마지막 사람이 아무것도 안 해도 라운드가 끝난다', () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5)])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13), c('star', 3)]) // 4등은 카드가 남는다
+    g.turn = 0
+    g.leader = 0
+
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-9'] }, r)
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    // 여기서 0·1·2가 다 나갔다 → 3번이 패스를 누르지 않아도 끝나야 한다
+    expect(g.finishOrder).toEqual([0, 1, 2])
+    expect(g.phase).toBe('roundEnd')
+  })
+
+  it('원투 피니시도 즉시 끝난다 (3등을 기다리지 않는다)', () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5)])
+    setHand(g, 1, [c('sword', 9), c('sword', 3)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13), c('star', 2)])
+    g.turn = 0
+    g.leader = 0
+
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    // 0번과 2번이 같은 팀 → 원투 피니시
+    expect(g.finishOrder).toEqual([0, 2])
+    expect(g.phase).toBe('roundEnd')
+    expect(g.lastRound?.doubleWin).toBe(0)
+    expect(g.lastRound?.total[0]).toBe(200)
+  })
+
+  it('2명만 나갔고 같은 팀이 아니면 계속 진행한다', () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5)])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11), c('pagoda', 4)])
+    setHand(g, 3, [c('star', 13), c('star', 2)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-9'] }, r)
+    // 0(팀0)과 1(팀1)이 나갔다 — 다른 팀이므로 계속
+    expect(g.finishOrder).toEqual([0, 1])
+    expect(g.phase).toBe('playing')
+  })
+})
+
+describe('봉황 단독 (직전 카드 + 0.5)', () => {
+  it('테이블의 2 위에 봉황을 내면 2.5가 되어 이긴다', async () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 2)])
+    setHand(g, 1, [phoenix, c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-2'] }, r)
+    // 값을 지정하지 않아도 서버가 테이블에서 계산한다
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['phoenix'] }, r)
+    expect(g.current?.rank).toBe(2.5)
+  })
+
+  it('A 위에서는 14.5가 되어 이긴다', async () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 14)])
+    setHand(g, 1, [phoenix])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-14'] }, r)
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['phoenix'] }, r)
+    expect(g.current?.rank).toBe(14.5)
+  })
+
+  it('용은 못 이긴다', async () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [dragon])
+    setHand(g, 1, [phoenix])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['dragon'] }, r)
+    expect(() => reduce(g, { type: 'play', seat: 1, cardIds: ['phoenix'] }, r)).toThrow(/이길 수 없/)
+  })
+
+  it('리드로 내면 1.5', async () => {
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [phoenix, c('jade', 5)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['phoenix'] }, r)
+    expect(g.current?.rank).toBe(1.5)
+  })
+
+  it('조합 안의 봉황은 영향받지 않는다', async () => {
+    const { parseAgainst, parseCombo } = await import('../src/tichu/combo.js')
+    const pair = [c('jade', 9), phoenix]
+    const onTable = parseCombo([c('jade', 3), c('star', 3)])
+    expect(parseAgainst(pair, onTable)?.rank).toBe(9)
+  })
+})
+
 describe('팀 조합', () => {
   it('1·3 vs 2·4는 자리를 그대로 둔다 (기본)', async () => {
     const { seatArrangement, teamsOf } = await import('../src/tichu/teams.js')
@@ -419,6 +653,73 @@ describe('뷰 마스킹', () => {
     expect(v.seats[1]!.passed).toBe(true)
     expect(v.seats[0]!.played?.cards[0]!.id).toBe('jade-5')
     expect(v.seats[0]!.leading).toBe(true)
+  })
+
+  it('패스 표시는 누가 카드를 내도 유지된다 (실제로 낼 때까지)', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5), c('jade', 6)])
+    setHand(g, 1, [c('sword', 9), c('sword', 14)])
+    setHand(g, 2, [c('pagoda', 11), c('pagoda', 12)])
+    setHand(g, 3, [c('star', 13), c('star', 2)])
+    g.turn = 0
+    g.leader = 0
+
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'pass', seat: 1 }, r)
+    expect(viewFor(g, 0).seats[1]!.passed).toBe(true)
+
+    // 2번이 카드를 내면 1번은 다시 낼 수 있게 되지만(passed 플래그는 풀림)
+    // 화면 표시는 계속 덮여 있어야 한다
+    g = reduce(g, { type: 'play', seat: 2, cardIds: ['pagoda-11'] }, r)
+    expect(g.passed[1]).toBe(false) // 재진입 가능
+    expect(viewFor(g, 0).seats[1]!.passed).toBe(true) // 표시는 유지
+
+    // 실제로 내면 풀린다
+    g = reduce(g, { type: 'pass', seat: 3 }, r)
+    g = reduce(g, { type: 'pass', seat: 0 }, r)
+    // 1번 차례. pagoda-11을 이겨야 하므로 12 이상이 필요하다
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-14'] }, r)
+    expect(viewFor(g, 0).seats[1]!.passed).toBe(false)
+    expect(viewFor(g, 0).seats[1]!.played?.cards[0]!.id).toBe('sword-14')
+  })
+
+  it('트릭이 끝나면 패스 표시가 초기화된다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    setHand(g, 0, [c('jade', 5), c('jade', 6)])
+    setHand(g, 1, [c('sword', 9)])
+    setHand(g, 2, [c('pagoda', 11)])
+    setHand(g, 3, [c('star', 13)])
+    g.turn = 0
+    g.leader = 0
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    for (const s of [1, 2, 3]) g = reduce(g, { type: 'pass', seat: s }, r)
+    for (const s of [0, 1, 2, 3]) expect(viewFor(g, 0).seats[s]!.passed).toBe(false)
+  })
+
+  it('카드 점수가 실시간으로 집계된다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const r = rng()
+    let g = toPlaying()
+    // 5점짜리 카드(5)와 10점짜리(K)를 0번이 가져가게 만든다
+    setHand(g, 0, [c('jade', 5), c('jade', 6)])
+    setHand(g, 1, [c('sword', 13)])
+    setHand(g, 2, [c('pagoda', 2)])
+    setHand(g, 3, [c('star', 3)])
+    g.turn = 0
+    g.leader = 0
+    expect(viewFor(g, 0).liveCardPoints).toEqual([0, 0])
+
+    g = reduce(g, { type: 'play', seat: 0, cardIds: ['jade-5'] }, r)
+    g = reduce(g, { type: 'play', seat: 1, cardIds: ['sword-13'] }, r)
+    for (const s of [2, 3, 0]) g = reduce(g, { type: 'pass', seat: s }, r)
+    // 1번(팀1)이 5(5점) + K(10점) = 15점을 가져갔다
+    const v = viewFor(g, 0)
+    expect(v.liveCardPoints).toEqual([0, 15])
+    expect(v.seats[1]!.wonPoints).toBe(15)
   })
 
   it('용을 낸 사람에게만 넘길 후보가 보인다', async () => {

@@ -12,11 +12,12 @@ interface Props {
   view: View
   remainingMs: number | null
   seq: number
+  autoPass: boolean
   isHost: boolean
   onError: (message: string) => void
 }
 
-export default function TichuGameView({ room, view, remainingMs, seq, isHost, onError }: Props) {
+export default function TichuGameView({ room, view, remainingMs, seq, autoPass, isHost, onError }: Props) {
   const [busy, setBusy] = useState(false)
   const [picked, setPicked] = useState<string[]>([])
   const [phoenixChoices, setPhoenixChoices] = useState<tichu.Combo[] | null>(null)
@@ -48,7 +49,9 @@ export default function TichuGameView({ room, view, remainingMs, seq, isHost, on
 
   const myTurn = view.turn === view.seat && view.phase === 'playing'
   const pickedCards = view.hand.filter((c) => picked.includes(c.id))
-  const combo = pickedCards.length > 0 ? tichu.parseCombo(pickedCards) : null
+  // 봉황을 단독으로 낼 때는 값이 테이블에서 정해진다 (직전 카드 + 0.5).
+  // 서버와 같은 계산을 써야 "낼 수 있는데 못 낸다"고 표시되지 않는다.
+  const combo = pickedCards.length > 0 ? tichu.parseAgainst(pickedCards, view.current) : null
   const canBeatNow = combo ? tichu.canBeat(combo, view.current) : false
 
   const toggle = (id: string) =>
@@ -56,7 +59,9 @@ export default function TichuGameView({ room, view, remainingMs, seq, isHost, on
 
   /** 카드 내기 — 봉황 해석이 여러 개면 먼저 물어본다 */
   const submitPlay = (phoenixAs?: number) => {
-    const options = tichu.phoenixOptions(pickedCards)
+    // 봉황 단독은 값이 자동으로 정해지므로 물어보지 않는다
+    const lonePhoenix = pickedCards.length === 1 && pickedCards[0]?.kind === 'phoenix'
+    const options = lonePhoenix ? [] : tichu.phoenixOptions(pickedCards)
     if (phoenixAs === undefined && options.length > 1) {
       setPhoenixChoices(options)
       return
@@ -91,6 +96,17 @@ export default function TichuGameView({ room, view, remainingMs, seq, isHost, on
           />
         ))}
       </section>
+
+      {view.received.length > 0 && view.phase !== 'gameEnd' && (
+        <ReceivedLog view={view} nameOf={nameOf} />
+      )}
+
+      {autoPass && view.phase === 'playing' && (
+        <p className="autopassbar">
+          <strong>전체 패스 켜짐</strong> — 내 차례가 오면 자동으로 패스합니다.
+          리드하거나 마작 소원을 이행해야 하면 자동으로 풀립니다.
+        </p>
+      )}
 
       {view.wish !== null && (
         <p className="wishbar">
@@ -183,6 +199,15 @@ export default function TichuGameView({ room, view, remainingMs, seq, isHost, on
                 >
                   패스
                 </button>
+                <button
+                  type="button"
+                  className={autoPass ? 'autopass autopass--on' : 'autopass'}
+                  disabled={busy}
+                  title="이번 라운드 동안 자동으로 패스합니다. 리드하거나 소원을 이행해야 하면 자동으로 풀립니다."
+                  onClick={() => void run(() => request('tichu:autopass', { on: !autoPass }))}
+                >
+                  {autoPass ? '전체 패스 끄기' : '전체 패스'}
+                </button>
                 {picked.length > 0 && (
                   <button type="button" className="ghost" onClick={() => setPicked([])}>
                     선택 해제
@@ -246,6 +271,7 @@ export default function TichuGameView({ room, view, remainingMs, seq, isHost, on
 
 function TichuTopBar({ view }: { view: View }) {
   const [a, b] = view.totals
+  const live = view.liveCardPoints
   return (
     <section className="topinfo">
       <div className="topinfo__round">
@@ -256,11 +282,13 @@ function TichuTopBar({ view }: { view: View }) {
         <span className={view.team === 0 ? 'teamscore__t is-mine' : 'teamscore__t'}>
           <em>1·3팀</em>
           <b>{a}</b>
+          {live[0] !== 0 && <i className="teamscore__live">이번 {live[0] > 0 ? '+' : ''}{live[0]}</i>}
         </span>
         <span className="teamscore__vs">vs</span>
         <span className={view.team === 1 ? 'teamscore__t is-mine' : 'teamscore__t'}>
           <em>2·4팀</em>
           <b>{b}</b>
+          {live[1] !== 0 && <i className="teamscore__live">이번 {live[1] > 0 ? '+' : ''}{live[1]}</i>}
         </span>
       </div>
     </section>
@@ -348,23 +376,33 @@ function SeatRow({
     <div className={classes}>
       <div className="seatrow__who">
         <span className="seatrow__name">
+          {active && <em className="turnmark">▶</em>}
           {name}
           {me && <em className="flagchip">나</em>}
         </span>
         <span className="seatrow__meta">
-          {info.declaration === 'tichu' && <em className="decl decl--small">티츄</em>}
-          {info.declaration === 'grand' && <em className="decl decl--grand">그랜드</em>}
+          {info.declaration === 'tichu' && <em className="decl decl--small">티츄 선언</em>}
+          {info.declaration === 'grand' && <em className="decl decl--grand">그랜드 티츄</em>}
           {info.finished !== null && <em className="flagchip">{info.finished}등 골인</em>}
           <em className="seatrow__count">{info.cards}장</em>
+          {info.wonPoints !== 0 && (
+            <em className={info.wonPoints > 0 ? 'wonpts' : 'wonpts wonpts--minus'}>
+              {info.wonPoints > 0 ? '+' : ''}
+              {info.wonPoints}점
+            </em>
+          )}
         </span>
       </div>
 
+      {active && phase === 'playing' && <span className="seatrow__turnlabel">지금 차례</span>}
+
       <div className="seatrow__play">
         {info.played ? (
-          <div className="seatrow__cards">
+          <div className={info.playedDog ? 'seatrow__cards seatrow__cards--dog' : 'seatrow__cards'}>
             {info.played.cards.map((c) => (
               <TichuCard key={c.id} card={c} size="md" phoenixAs={info.played?.phoenixAs} />
             ))}
+            {info.playedDog && <span className="doglabel">개 — 파트너에게 리드</span>}
           </div>
         ) : info.passed ? (
           <div className="seatrow__cards seatrow__cards--pass">
@@ -460,15 +498,24 @@ function PassPanel({
       </div>
 
       <div className="passslots">
-        {targets.map((seat, i) => (
-          <div key={seat} className={chosen[i] ? 'passslot is-filled' : 'passslot'}>
-            <span className="passslot__label">
-              {PASS_TARGETS[i]}
-              <em>{nameOf(seat)}</em>
-            </span>
-            {chosen[i] ? <TichuCard card={chosen[i]!} size="md" /> : <div className="passslot__empty" />}
-          </div>
-        ))}
+        {targets.map((seat, i) => {
+          const card = chosen[i]
+          return (
+            <div key={seat} className={card ? 'passslot is-filled' : 'passslot'}>
+              <span className="passslot__label">
+                {PASS_TARGETS[i]}
+                <em>{nameOf(seat)}</em>
+              </span>
+              {card ? (
+                // 슬롯을 눌러도 취소된다 (손패에서 다시 찾지 않아도 되게)
+                <TichuCard card={card} size="md" onClick={() => toggle(card.id)} />
+              ) : (
+                <div className="passslot__empty" />
+              )}
+              {card && <span className="passslot__hint">눌러서 취소</span>}
+            </div>
+          )
+        })}
       </div>
 
       <div className="handrow">
@@ -641,6 +688,29 @@ function TichuGameEnd({ view, nameOf }: { view: View; nameOf: (s: number) => str
           </li>
         ))}
       </ol>
+    </section>
+  )
+}
+
+/** 이번 라운드 교환에서 누가 나에게 뭘 줬는지. 접었다 펼 수 있다. */
+function ReceivedLog({ view, nameOf }: { view: View; nameOf: (s: number) => string }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <section className="recvlog">
+      <button type="button" className="recvlog__head" onClick={() => setOpen((o) => !o)}>
+        <span>내가 받은 카드</span>
+        <em>{open ? '접기' : '펼치기'}</em>
+      </button>
+      {open && (
+        <div className="recvlog__body">
+          {view.received.map(({ from, card }) => (
+            <div key={card.id} className="recvlog__item">
+              <span className="recvlog__from">{nameOf(from)}</span>
+              <TichuCard card={card} size="sm" />
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

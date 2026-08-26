@@ -1,5 +1,5 @@
 import { deal, shuffle, type Rng } from '../common/rng.js'
-import { canBeat, parseCombo, type ParseOptions } from './combo.js'
+import { canBeat, parseAgainst, parseCombo, type ParseOptions } from './combo.js'
 import { buildDeck, cardPoints, handPoints } from './deck.js'
 import { DEFAULT_TICHU_OPTIONS, type TichuRuleOptions } from './options.js'
 import { partnerOf, teamOf, type Combo, type Declaration, type TichuCard } from './types.js'
@@ -55,6 +55,11 @@ export interface TichuGameState {
   passSelections: Array<string[] | null>
   /** 첫 카드를 냈는지 — 티츄는 첫 카드 내기 전까지만 선언 가능 */
   played: boolean[]
+  /**
+   * 교환에서 **누구에게서 무엇을 받았는지**. 라운드 내내 유지한다.
+   * 받은 카드를 손에 섞어 넣고 나면 뭘 받았는지 잊어버리기 쉬워서 남겨둔다.
+   */
+  received: Array<Array<{ from: number; card: TichuCard }>>
 
   leader: number
   turn: number
@@ -62,8 +67,14 @@ export interface TichuGameState {
   trick: TichuPlay[]
   /** 지금 테이블 위 조합 (이걸 이겨야 낼 수 있다) */
   current: Combo | null
-  /** 이번 트릭에서 패스한 좌석 */
+  /** 이번 트릭에서 패스한 좌석. 누가 카드를 내면 초기화된다(재진입 가능하므로) */
   passed: boolean[]
+  /**
+   * 이번 트릭에서 마지막으로 한 행동. **passed와 달리 초기화되지 않는다.**
+   * 화면에서 "패스한 사람은 카드를 낼 때까지 계속 덮어두기" 위해 필요하다.
+   * 트릭이 끝날 때만 비운다.
+   */
+  trickAction: Array<'play' | 'pass' | null>
   /** 마작 소원. 아직 이행되지 않은 값 */
   wish: number | null
   /** 손패를 턴 순서 (먼저 턴 사람부터) */
@@ -72,6 +83,12 @@ export interface TichuGameState {
   won: TichuCard[][]
   /** 용으로 이겨서 넘겨야 하는 트릭 (dragonGift 단계) */
   pendingDragon: { winner: number; cards: TichuCard[] } | null
+  /**
+   * 개를 낸 기록. 개는 트릭을 만들지 않고 사라지기 때문에
+   * 그냥 두면 **누가 개를 냈는지 화면에서 알 수가 없다.**
+   * 다음 트릭이 끝날 때까지 남겨서 보여준다.
+   */
+  dogNote: { seat: number; card: TichuCard } | null
 
   totals: [number, number]
   history: RoundScore[]
@@ -107,15 +124,18 @@ export function createGame(opts: TichuRuleOptions = DEFAULT_TICHU_OPTIONS, rng?:
     grandDecided: [false, false, false, false],
     passSelections: [null, null, null, null],
     played: [false, false, false, false],
+    received: [[], [], [], []],
     leader: 0,
     turn: 0,
     trick: [],
     current: null,
     passed: [false, false, false, false],
+    trickAction: [null, null, null, null],
     wish: null,
     finishOrder: [],
     won: [[], [], [], []],
     pendingDragon: null,
+    dogNote: null,
     totals: [0, 0],
     history: [],
     lastRound: null,
@@ -135,13 +155,16 @@ export function startRound(state: TichuGameState, rng: Rng): void {
   state.grandDecided = [false, false, false, false]
   state.passSelections = [null, null, null, null]
   state.played = [false, false, false, false]
+  state.received = [[], [], [], []]
   state.trick = []
   state.current = null
   state.passed = [false, false, false, false]
+  state.trickAction = [null, null, null, null]
   state.wish = null
   state.finishOrder = []
   state.won = [[], [], [], []]
   state.pendingDragon = null
+  state.dogNote = null
   state.lastRound = null
   state.phase = 'grandTichu'
 }
@@ -203,11 +226,14 @@ function exchange(state: TichuGameState): void {
     const ids = new Set(outgoing[seat]!.map((c) => c.id))
     state.hands[seat] = (state.hands[seat] ?? []).filter((c) => !ids.has(c.id))
   }
-  // 받는다
+  // 받는다. 동시에 누가 뭘 줬는지 기록한다.
+  state.received = [[], [], [], []]
   for (const seat of SEATS) {
     for (let i = 0; i < 3; i++) {
       const to = (seat + 1 + i) % 4
-      state.hands[to] = [...(state.hands[to] ?? []), outgoing[seat]![i]!]
+      const card = outgoing[seat]![i]!
+      state.hands[to] = [...(state.hands[to] ?? []), card]
+      state.received[to]!.push({ from: seat, card })
     }
   }
 
@@ -312,7 +338,8 @@ function applyPlay(
     cards.push(card)
   }
 
-  const combo = parseCombo(cards, parseOpts)
+  // 봉황을 단독으로 낼 때는 값이 테이블에서 정해진다 (직전 카드 + 0.5)
+  const combo = parseAgainst(cards, state.current, parseOpts)
   if (!combo) err('유효한 조합이 아닙니다.')
 
   const isBomb = combo.isBomb
@@ -342,9 +369,11 @@ function applyPlay(
   // 개는 트릭을 만들지 않고 파트너에게 리드를 넘긴다
   if (combo.type === 'dog') {
     const to = dogTarget(state, seat)
+    state.dogNote = { seat, card: cards[0]! }
     state.trick = []
     state.current = null
     state.passed = [false, false, false, false]
+    state.trickAction = [null, null, null, null]
     state.leader = to
     state.turn = to
     state.won[seat] = state.won[seat] ?? []
@@ -354,10 +383,19 @@ function applyPlay(
 
   state.trick.push({ seat, combo })
   state.current = combo
-  // 폭탄이 터지면 패스했던 사람도 다시 낼 기회가 생긴다
+  state.trickAction[seat] = 'play'
+  // 폭탄이 터지면 패스했던 사람도 다시 낼 기회가 생긴다.
+  // (trickAction은 그대로 둔다 — 패스한 사람은 실제로 낼 때까지 계속 덮인 상태로 보인다)
   state.passed = [false, false, false, false]
 
   checkFinished(state, seat)
+
+  // 3명이 나갔거나 원투 피니시가 나오면 **그 자리에서 라운드가 끝난다.**
+  // 남은 한 명이 패스할 때까지 기다릴 이유가 없다.
+  if (isRoundOver(state)) {
+    finishTrick(state, seat)
+    return
+  }
 
   const next = nextTurn(state, seat)
   if (next === null || next === seat) {
@@ -374,6 +412,7 @@ function applyPass(state: TichuGameState, seat: number): void {
   if (mustFulfillWish(state, seat)) err(`마작 소원(${state.wish})을 낼 수 있으면 반드시 내야 합니다.`)
 
   state.passed[seat] = true
+  state.trickAction[seat] = 'pass'
   const next = nextTurn(state, seat)
   const winner = state.trick[state.trick.length - 1]?.seat
   if (next === null || next === winner) {
@@ -393,6 +432,8 @@ function finishTrick(state: TichuGameState, winner: number): void {
   state.trick = []
   state.current = null
   state.passed = [false, false, false, false]
+  state.trickAction = [null, null, null, null]
+  state.dogNote = null
 
   if (hasDragon && wonByDragon) {
     // 용으로 이기면 트릭 전체를 상대팀 한 명에게 넘겨야 한다
@@ -556,11 +597,14 @@ function clone(s: TichuGameState): TichuGameState {
     grandDecided: [...s.grandDecided],
     passSelections: s.passSelections.map((p) => (p ? [...p] : null)),
     played: [...s.played],
+    received: s.received.map((r) => r.map((x) => ({ ...x }))),
     trick: [...s.trick],
     passed: [...s.passed],
+    trickAction: [...s.trickAction],
     finishOrder: [...s.finishOrder],
     won: s.won.map((w) => [...w]),
     pendingDragon: s.pendingDragon ? { ...s.pendingDragon, cards: [...s.pendingDragon.cards] } : null,
+    dogNote: s.dogNote ? { ...s.dogNote } : null,
     totals: [...s.totals] as [number, number],
     history: [...s.history],
   }

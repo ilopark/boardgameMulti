@@ -38,6 +38,8 @@ export interface Room {
   tichuGame: TichuGameState | null
   /** 티츄 시작 시 정해진 자리 배치. arrangement[게임좌석] = 로비 자리 */
   seatArrangement: number[] | null
+  /** 티츄 전체 패스를 켠 좌석들. 라운드가 끝나면 초기화된다 */
+  tichuAutoPass: boolean[]
   /** trickEnd/roundEnd 자동 진행 타이머 */
   advanceTimer: NodeJS.Timeout | null
   /** 제한시간 초과 시 대신 행동해 주는 타이머 */
@@ -79,6 +81,7 @@ export function createRoom(game: GameId, defaultOptions: Record<string, unknown>
     skGame: null,
     tichuGame: null,
     seatArrangement: null,
+    tichuAutoPass: [false, false, false, false],
     advanceTimer: null,
     turnTimer: null,
     turnDeadline: null,
@@ -158,14 +161,22 @@ export function sweep(disconnectGraceMs = 3 * 60_000, emptyRoomTtlMs = 10 * 60_0
   const changed: string[] = []
   for (const [code, room] of rooms) {
     let dirty = false
-    for (const [id, p] of room.players) {
-      if (p.socketId === null && p.disconnectedAt !== null && now - p.disconnectedAt > disconnectGraceMs) {
-        room.players.delete(id)
-        dirty = true
+    // **게임 중에는 아무도 내보내지 않는다.**
+    // 인터넷이 몇 분 끊겼다고 자리를 빼면 남은 사람들의 판까지 깨진다.
+    // 자리를 비운 사람은 제한시간이 지나면 서버가 대신 행동해 주므로 판은 계속 굴러간다.
+    if (room.phase === 'lobby') {
+      for (const [id, p] of room.players) {
+        if (p.socketId === null && p.disconnectedAt !== null && now - p.disconnectedAt > disconnectGraceMs) {
+          room.players.delete(id)
+          dirty = true
+        }
       }
     }
     if (dirty) reassignHostIfNeeded(room)
-    if (room.players.size === 0 && now - room.createdAt > emptyRoomTtlMs) {
+    // 아무도 연결돼 있지 않은 방은 오래되면 정리한다 (게임 중이어도 전원이 나갔으면 의미가 없다)
+    const anyoneConnected = [...room.players.values()].some((p) => p.socketId !== null)
+    const stale = now - room.createdAt > emptyRoomTtlMs
+    if ((room.players.size === 0 || !anyoneConnected) && stale) {
       rooms.delete(code)
       continue
     }

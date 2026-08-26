@@ -74,6 +74,11 @@ export interface ClientToServer {
     cb: (r: Ack<null>) => void,
   ) => void
   'tichu:pass': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /**
+   * 이번 라운드 동안 자동으로 패스한다. 언제든 꺼서 취소할 수 있다.
+   * 리드해야 하거나 마작 소원을 이행해야 하면 자동으로 풀린다.
+   */
+  'tichu:autopass': (p: { on: boolean }, cb: (r: Ack<null>) => void) => void
   /** 마작 소원. null이면 부르지 않음 */
   'tichu:wish': (p: { rank: number | null }, cb: (r: Ack<null>) => void) => void
   /** 용으로 딴 트릭을 상대팀 누구에게 줄지 */
@@ -88,6 +93,11 @@ export interface ServerToClient {
    * view의 타입은 순환 참조를 피하려고 unknown으로 두고, 클라이언트가 캐스팅한다.
    */
   'game:view': (msg: GameViewMessage) => void
+  /**
+   * 방 전체에 잠깐 띄우는 알림. 티츄 선언처럼 **모두가 즉시 알아야 하는 일**에 쓴다.
+   * 뷰에 실어보내면 다음 갱신 때 조용히 반영돼서 놓치기 쉽다.
+   */
+  'game:announce': (p: { kind: 'tichu' | 'grand'; seat: number; nickname: string }) => void
   'room:closed': (p: { reason: string }) => void
   /** 서버가 판단한 에러를 토스트로 띄우기 위한 채널 */
   'error:toast': (p: { message: string }) => void
@@ -106,6 +116,8 @@ export interface GameViewMessage<V = unknown> {
   remainingMs: number | null
   /** 지금 기다리고 있는 좌석들 (입찰 단계면 여러 명) */
   waitingFor: number[]
+  /** 티츄 전체 패스가 켜져 있는지 (받는 사람 기준) */
+  autoPass?: boolean
 }
 
 export const SEAT_COUNT: Record<GameId, number> = {

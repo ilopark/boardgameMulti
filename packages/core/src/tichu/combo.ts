@@ -226,3 +226,37 @@ export function phoenixOptions(cards: readonly TichuCard[]): Combo[] {
 export function needsPhoenixChoice(cards: readonly TichuCard[]): boolean {
   return phoenixOptions(cards).length > 1
 }
+
+/**
+ * 봉황을 **단독으로** 낼 때의 값.
+ *
+ * 룰: 직전에 나온 카드보다 0.5 높다. 리드로 내면 1.5.
+ * 그래서 A(14) 위에는 14.5로 이기지만, 용(15)은 못 이긴다.
+ *
+ * 이 값은 **플레이어가 고르는 게 아니라 테이블 상황이 정한다.**
+ * 서버와 클라이언트가 같은 계산을 쓰도록 여기 한 곳에 둔다.
+ */
+export function phoenixSingleRank(current: Combo | null): number {
+  if (current === null) return 1.5
+  if (current.type !== 'single') return 1.5
+  // 룰: 봉황은 A는 이겨도 **용은 못 이긴다.**
+  // 그냥 +0.5를 하면 15.5가 되어 용을 이겨버리므로 여기서 막는다.
+  if (current.cards.some((c) => c.kind === 'dragon')) return 1.5
+  return current.rank + 0.5
+}
+
+/**
+ * 지금 테이블 상황에 맞춰 조합을 파싱한다.
+ * 봉황 단독이면 값을 테이블에서 계산해 넣어준다.
+ */
+export function parseAgainst(
+  cards: readonly TichuCard[],
+  current: Combo | null,
+  opts: ParseOptions = {},
+): Combo | null {
+  const isLonePhoenix = cards.length === 1 && cards[0]?.kind === 'phoenix'
+  if (isLonePhoenix && opts.phoenixAs === undefined) {
+    return parseCombo(cards, { ...opts, phoenixAs: phoenixSingleRank(current) })
+  }
+  return parseCombo(cards, opts)
+}

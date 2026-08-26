@@ -114,7 +114,12 @@ function broadcastGame(room: Room): void {
     const view = room.skGame
       ? skullking.viewFor(room.skGame, player.seat)
       : tichu.viewFor(room.tichuGame!, player.seat)
-    socket?.emit('game:view', { view, remainingMs, waitingFor })
+    socket?.emit('game:view', {
+      view,
+      remainingMs,
+      waitingFor,
+      autoPass: room.tichuAutoPass[player.seat] ?? false,
+    })
   }
 }
 
@@ -212,11 +217,44 @@ function handleTichuTimeout(room: Room): void {
 }
 
 /**
+ * 전체 패스를 켠 사람의 차례면 대신 패스해 준다.
+ *
+ * 리드해야 하거나 마작 소원을 이행해야 하면 패스가 불가능하므로 그때는 **자동으로 꺼진다.**
+ * 재귀 대신 루프로 도는 이유는, 여러 명이 켜 뒀을 때 한 번에 처리하기 위해서다.
+ */
+function runTichuAutoPass(room: Room): void {
+  const rng = room.rng
+  if (!rng) return
+  for (let guard = 0; guard < 16; guard++) {
+    const game = room.tichuGame
+    if (!game || game.phase !== 'playing') return
+    const seat = game.turn
+    if (!room.tichuAutoPass[seat]) return
+    // 리드는 반드시 내야 하고, 소원도 이행해야 한다 → 자동 패스를 끈다
+    if (game.current === null || tichu.mustFulfillWish(game, seat)) {
+      room.tichuAutoPass[seat] = false
+      return
+    }
+    try {
+      room.tichuGame = tichu.reduce(game, { type: 'pass', seat }, rng)
+    } catch {
+      room.tichuAutoPass[seat] = false
+      return
+    }
+  }
+}
+
+/**
  * 게임 상태가 바뀐 뒤 공통 처리.
  * **타이머를 먼저 세팅하고 그 다음에 뷰를 보낸다** — 순서가 반대면
  * 클라이언트가 직전 단계의 남은 시간을 받아서 카운트다운이 엉뚱하게 나온다.
  */
 function afterGameChange(room: Room): void {
+  runTichuAutoPass(room)
+  // 라운드가 끝나면 전체 패스는 초기화한다 (다음 라운드까지 끌고 가지 않는다)
+  if (room.tichuGame && room.tichuGame.phase !== 'playing') {
+    room.tichuAutoPass = [false, false, false, false]
+  }
   scheduleTurnTimeout(room)
   scheduleAdvance(room)
   broadcastGame(room)
@@ -273,6 +311,7 @@ function resetToLobby(room: Room): void {
   room.skGame = null
   room.tichuGame = null
   room.seatArrangement = null
+  room.tichuAutoPass = [false, false, false, false]
   room.rng = null
   room.dealerSeat = null
   room.phase = 'lobby'
@@ -516,7 +555,23 @@ io.on('connection', (socket) => {
   }
 
   socket.on('tichu:grand', ({ call }, cb) => {
-    withTichu(cb, (seat) => ({ type: 'grandTichu', seat, call: Boolean(call) }))
+    const ctx = currentRoomAndPlayer(socket)
+    let declared = false
+    withTichu(
+      (r) => {
+        declared = r.ok
+        cb(r)
+      },
+      (seat) => ({ type: 'grandTichu', seat, call: Boolean(call) }),
+    )
+    // 실제로 선언에 성공했을 때만 알린다
+    if (call && declared && ctx) {
+      io.to(ctx.room.code).emit('game:announce', {
+        kind: 'grand',
+        seat: ctx.player.seat ?? 0,
+        nickname: ctx.player.nickname,
+      })
+    }
   })
 
   socket.on('tichu:pass3', ({ cardIds }, cb) => {
@@ -527,7 +582,22 @@ io.on('connection', (socket) => {
   })
 
   socket.on('tichu:call', (_p, cb) => {
-    withTichu(cb, (seat) => ({ type: 'tichu', seat }))
+    const ctx = currentRoomAndPlayer(socket)
+    let declared = false
+    withTichu(
+      (r) => {
+        declared = r.ok
+        cb(r)
+      },
+      (seat) => ({ type: 'tichu', seat }),
+    )
+    if (declared && ctx) {
+      io.to(ctx.room.code).emit('game:announce', {
+        kind: 'tichu',
+        seat: ctx.player.seat ?? 0,
+        nickname: ctx.player.nickname,
+      })
+    }
   })
 
   socket.on('tichu:play', ({ cardIds, phoenixAs, asBomb }, cb) => {
@@ -542,6 +612,17 @@ io.on('connection', (socket) => {
 
   socket.on('tichu:pass', (_p, cb) => {
     withTichu(cb, (seat) => ({ type: 'pass', seat }))
+  })
+
+  socket.on('tichu:autopass', ({ on }, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (!room.tichuGame) return cb({ ok: false, error: '진행 중인 티츄 게임이 없습니다.' })
+    if (player.seat === null) return cb({ ok: false, error: '자리에 앉아 있지 않습니다.' })
+    room.tichuAutoPass[player.seat] = Boolean(on)
+    cb({ ok: true })
+    afterGameChange(room)
   })
 
   socket.on('tichu:wish', ({ rank }, cb) => {

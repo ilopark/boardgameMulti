@@ -15,8 +15,16 @@ export interface TichuSeatInfo {
   declaration: Declaration
   /** 이번 트릭에 낸 조합. 아직 안 냈으면 null */
   played: Combo | null
-  /** 이번 트릭에서 패스했는지 — 화면에는 카드 뒷면으로 보여준다 */
+  /** 개를 내서 리드를 넘겼는지. 개는 트릭을 안 만들어서 따로 표시해야 한다 */
+  playedDog: boolean
+  /**
+   * 이번 트릭에서 패스한 상태인지.
+   * **누가 카드를 내도 풀리지 않는다** — 실제로 카드를 내야 풀린다.
+   * 화면에는 카드 뒷면으로 계속 덮어둔다.
+   */
   passed: boolean
+  /** 이번 라운드에 지금까지 딴 카드 점수 (실시간 집계) */
+  wonPoints: number
   /** 지금 테이블을 잡고 있는 사람인지 */
   leading: boolean
   /** 손패를 다 털었으면 몇 번째로 끝났는지 (1부터). 아직이면 null */
@@ -48,13 +56,20 @@ export interface TichuPlayerView {
   grandDecided: boolean
   /** 교환 단계 — 내가 3장을 냈는지 */
   passSubmitted: boolean
+  /**
+   * 이번 라운드 교환에서 **내가** 받은 카드들. 나만 받는다.
+   * 손에 섞여 들어가면 뭘 받았는지 잊어버려서 따로 보여준다.
+   */
+  received: Array<{ from: number; card: TichuCard }>
   /** 아직 티츄를 선언할 수 있는지 (첫 카드 내기 전) */
   canCallTichu: boolean
   /** 용을 넘겨야 하는 상황이면 넘길 후보(상대팀 좌석) */
   dragonTargets: number[]
 
-  /** 팀 누적 점수 */
+  /** 팀 누적 점수 (지난 라운드까지) */
   totals: [number, number]
+  /** 이번 라운드 팀별 카드 점수 실시간 집계 */
+  liveCardPoints: [number, number]
   /** 내가 이번 라운드에 딴 카드 점수 (참고용) */
   myWonPoints: number
   lastRound: RoundScore | null
@@ -91,6 +106,18 @@ export function sortHand(cards: readonly TichuCard[]): TichuCard[] {
   })
 }
 
+/** 개를 낸 사람의 자리에 보여줄 가짜 조합 (실제 트릭에는 없다) */
+function dogComboFor(state: TichuGameState, seat: number): Combo | null {
+  if (state.dogNote?.seat !== seat) return null
+  return {
+    type: 'dog',
+    cards: [state.dogNote.card],
+    length: 1,
+    rank: 0,
+    isBomb: false,
+  }
+}
+
 export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
   const lastPlayBySeat = new Map<number, Combo>()
   for (const p of state.trick) lastPlayBySeat.set(p.seat, p.combo)
@@ -103,8 +130,10 @@ export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
       team: teamOf(s),
       cards: state.hands[s]?.length ?? 0,
       declaration: state.declarations[s] ?? 'none',
-      played: lastPlayBySeat.get(s) ?? null,
-      passed: state.passed[s] ?? false,
+      played: lastPlayBySeat.get(s) ?? dogComboFor(state, s),
+      playedDog: lastPlayBySeat.get(s) === undefined && state.dogNote?.seat === s,
+      passed: state.trickAction[s] === 'pass',
+      wonPoints: handPoints(state.won[s] ?? []),
       leading: leadingSeat === s,
       finished: finishedIdx >= 0 ? finishedIdx + 1 : null,
     }
@@ -130,12 +159,18 @@ export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
     wish: state.wish,
     grandDecided: state.grandDecided[seat] ?? false,
     passSubmitted: state.passSelections[seat] !== null,
+    received: (state.received[seat] ?? []).map((r) => ({ ...r })),
     canCallTichu:
       !state.played[seat] &&
       state.declarations[seat] === 'none' &&
       (state.phase === 'passing' || state.phase === 'playing'),
     dragonTargets,
     totals: [...state.totals] as [number, number],
+    liveCardPoints: [0, 1].map((t) =>
+      [0, 1, 2, 3]
+        .filter((sx) => teamOf(sx) === t)
+        .reduce((sum, sx) => sum + handPoints(state.won[sx] ?? []), 0),
+    ) as [number, number],
     myWonPoints: handPoints(state.won[seat] ?? []),
     lastRound: state.lastRound,
   }

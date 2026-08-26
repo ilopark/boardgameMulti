@@ -1,3 +1,4 @@
+/* 기본은 다크. data-theme="light"를 걸면 라이트로 바뀐다. */
 :root {
   --bg: #10131a;
   --surface: #191e29;
@@ -8,8 +9,39 @@
   --accent: #4f8cff;
   --ok: #3ecf8e;
   --warn: #f0a33d;
+  --team0: #4f8cff;
+  --team1: #f0a33d;
+  --shadow: rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
+
+:root[data-theme='light'] {
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f2f5fa;
+  --line: #d3dae6;
+  --text: #161b24;
+  --muted: #5f6b80;
+  --accent: #2563eb;
+  --ok: #12855c;
+  --warn: #b45309;
+  --team0: #2563eb;
+  --team1: #b45309;
+  --shadow: rgba(20, 30, 50, 0.14);
+  color-scheme: light;
+}
+
+/* 테마 전환 버튼 */
+.themebtn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 15px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  line-height: 1;
+}
+.themebtn:hover { border-color: var(--accent); color: var(--text); }
 
 * { box-sizing: border-box; }
 
@@ -279,11 +311,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-radius: 11px;
   border: none;
   background: linear-gradient(160deg, #f4f1e8, #d8d3c4);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 3px 8px var(--shadow);
 }
-.pcard--lg { width: 96px; height: 134px; }
-.pcard--md { width: 78px; height: 109px; }
-.pcard--sm { width: 60px; height: 84px; }
+.pcard--lg { width: 82px; height: 115px; }
+.pcard--md { width: 66px; height: 92px; }
+.pcard--sm { width: 52px; height: 73px; }
 
 /* 안쪽 색 패널 */
 .pcard::before {
@@ -469,10 +501,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: var(--surface); border: 1px solid var(--line);
   border-left: 4px solid var(--line);
   border-radius: 12px; padding: 10px 16px;
-  min-height: 112px;
+  min-height: 96px;
 }
-.seatrow--team0 { border-left-color: #4f8cff; }
-.seatrow--team1 { border-left-color: #f0a33d; }
+.seatrow--team0 { border-left-color: var(--team0); }
+.seatrow--team1 { border-left-color: var(--team1); }
 .seatrow.is-me { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .seatrow.is-active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .seatrow.is-leading { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
@@ -506,19 +538,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   position: relative; flex: none; display: block;
   padding: 0; border: none; background: none;
   border-radius: 7px; overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 6px var(--shadow);
   line-height: 0;
 }
-.tcard--lg { width: 82px; height: 125px; }
-.tcard--md { width: 64px; height: 98px; }
-.tcard--sm { width: 50px; height: 76px; }
+.tcard--lg { width: 70px; height: 107px; }
+.tcard--md { width: 54px; height: 82px; }
+.tcard--sm { width: 42px; height: 64px; }
 .tcard__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tcard__text {
   display: grid; place-items: center; width: 100%; height: 100%;
   background: var(--surface-2); color: var(--text);
   font-size: 12px; line-height: 1.2; text-align: center;
 }
-.tcard--back { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.tcard--back { box-shadow: 0 2px 6px var(--shadow); }
 .tcard__as {
   position: absolute; bottom: 3px; right: 3px;
   background: var(--accent); color: #fff;
@@ -570,5 +602,191 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 @media (max-width: 760px) {
   .seatrow { flex-direction: column; align-items: stretch; gap: 8px; }
   .seatrow__who { width: auto; flex-direction: row; justify-content: space-between; align-items: center; }
-  .tcard--lg { width: 70px; height: 107px; }
+  .tcard--lg { width: 62px; height: 95px; }
+}
+
+.topbar__right { display: flex; align-items: center; gap: 10px; }
+
+/* ── 차례 표시 강화 ── */
+.turnmark {
+  font-style: normal;
+  color: var(--accent);
+  font-size: 13px;
+  animation: turnpulse 1.1s ease-in-out infinite;
+}
+@keyframes turnpulse {
+  0%, 100% { opacity: 1; transform: translateX(0); }
+  50% { opacity: 0.45; transform: translateX(2px); }
+}
+.seatrow.is-active {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+.seatrow.is-active .seatrow__name { color: var(--accent); font-weight: 700; }
+
+/* ── 실시간 획득 점수 ── */
+.wonpts {
+  font-style: normal; font-size: 11px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+.wonpts--minus { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+
+.teamscore__live {
+  font-style: normal; font-size: 10px; color: var(--muted);
+  margin-top: 1px;
+}
+.teamscore__t { min-width: 56px; }
+
+/* ── 교환 슬롯 취소 안내 ── */
+.passslot__hint { font-size: 10px; color: var(--muted); }
+.passslot .tcard { cursor: pointer; }
+
+/* ── 티츄 선언 배지 (크게) ── */
+.decl {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  padding: 5px 12px;
+  border-radius: 8px;
+  line-height: 1;
+}
+.decl--small {
+  background: #3a5bbf;
+  color: #fff;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #3a5bbf 35%, transparent);
+}
+.decl--grand {
+  background: #c0392b;
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #c0392b 40%, transparent);
+  animation: declpulse 1.6s ease-in-out infinite;
+}
+@keyframes declpulse {
+  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, #c0392b 40%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, #c0392b 22%, transparent); }
+}
+
+/* ── 전체 패스 ── */
+.autopass {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+.autopass--on {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
+  font-weight: 700;
+}
+.autopassbar {
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line));
+  font-size: 13px;
+}
+
+/* ── 개를 냈을 때 ── */
+.seatrow__cards--dog { gap: 10px; }
+.doglabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ── 교환에서 받은 카드 로그 ── */
+.recvlog {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.recvlog__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+.recvlog__head em { font-style: normal; font-size: 11px; color: var(--muted); font-weight: 400; }
+.recvlog__body {
+  display: flex;
+  gap: 14px;
+  padding: 0 14px 12px;
+  flex-wrap: wrap;
+}
+.recvlog__item { display: flex; align-items: center; gap: 7px; }
+.recvlog__from {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 티츄 선언 알림 (방 전체에 잠깐) ── */
+.announce {
+  position: fixed;
+  left: 50%;
+  top: 28%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 18px 40px;
+  border-radius: 16px;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  animation: announcein 0.22s ease-out;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+}
+.announce--tichu { background: linear-gradient(160deg, #4064d0, #27408f); }
+.announce--grand { background: linear-gradient(160deg, #d1452f, #8f2418); }
+.announce__who { font-size: 14px; opacity: 0.9; }
+.announce__what { font-size: 32px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+.announce__sub { font-size: 12px; opacity: 0.8; }
+@keyframes announcein {
+  from { opacity: 0; transform: translateX(-50%) scale(0.85); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+/* ── 차례 표시 더 명확하게 ── */
+.seatrow__turnlabel {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent);
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: turnlabel 1.2s ease-in-out infinite;
+}
+@keyframes turnlabel {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+.seatrow.is-active {
+  border-left-width: 7px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }

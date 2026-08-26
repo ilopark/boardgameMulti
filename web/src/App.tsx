@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { GAME_LABEL, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
 import { clearIdentity, loadIdentity, request, saveIdentity, socket } from './socket.js'
+import { applyTheme, loadTheme, type Theme } from './theme.js'
 import Lobby from './Lobby.js'
 import RoomView from './RoomView.js'
 import GameView from './game/GameView.js'
@@ -16,6 +17,7 @@ interface GameMsg {
   view: unknown
   remainingMs: number | null
   waitingFor: number[]
+  autoPass?: boolean
   /**
    * 메시지마다 증가하는 번호.
    * 서버가 같은 remainingMs를 다시 보내면 React가 "값이 안 바뀌었다"고 보고
@@ -30,6 +32,12 @@ export default function App() {
   const [myId, setMyId] = useState<string | null>(null)
   const [connected, setConnected] = useState(socket.connected)
   const [toast, setToast] = useState<string | null>(null)
+  const [announce, setAnnounce] = useState<{ kind: 'tichu' | 'grand'; nickname: string } | null>(null)
+  const [theme, setTheme] = useState<Theme>(loadTheme)
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   const notify = useCallback((message: string) => {
     setToast(message)
@@ -47,6 +55,13 @@ export default function App() {
     let seq = 0
     const onGameView = (msg: unknown) =>
       setGame({ ...(msg as Omit<GameMsg, 'seq'>), seq: ++seq })
+    // 티츄 선언은 모두가 즉시 알아야 하므로 화면 가운데에 잠깐 띄운다
+    let announceTimer: ReturnType<typeof setTimeout> | undefined
+    const onAnnounce = (p: { kind: 'tichu' | 'grand'; nickname: string }) => {
+      setAnnounce(p)
+      clearTimeout(announceTimer)
+      announceTimer = setTimeout(() => setAnnounce(null), 1600)
+    }
     const onClosed = ({ reason }: { reason: string }) => {
       notify(reason)
       setRoom(null)
@@ -58,6 +73,7 @@ export default function App() {
     socket.on('disconnect', onDisconnect)
     socket.on('room:state', onState)
     socket.on('game:view', onGameView)
+    socket.on('game:announce', onAnnounce)
     socket.on('room:closed', onClosed)
     // 리스너를 붙이기 전에 이미 connect가 끝났을 수 있다. 현재 상태를 한 번 맞춰준다.
     setConnected(socket.connected)
@@ -66,6 +82,8 @@ export default function App() {
       socket.off('disconnect', onDisconnect)
       socket.off('room:state', onState)
       socket.off('game:view', onGameView)
+      socket.off('game:announce', onAnnounce)
+      clearTimeout(announceTimer)
       socket.off('room:closed', onClosed)
     }
   }, [notify])
@@ -122,8 +140,18 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <span className="brand">보드게임</span>
-        <span className={connected ? 'status status--on' : 'status status--off'}>
-          {connected ? '연결됨' : '연결 끊김'}
+        <span className="topbar__right">
+          <span className={connected ? 'status status--on' : 'status status--off'}>
+            {connected ? '연결됨' : '연결 끊김'}
+          </span>
+          <button
+            type="button"
+            className="themebtn"
+            title={theme === 'dark' ? '라이트 모드로' : '다크 모드로'}
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </span>
       </header>
 
@@ -136,6 +164,7 @@ export default function App() {
               view={game.view as tichu.TichuPlayerView}
               remainingMs={game.remainingMs}
               seq={game.seq}
+              autoPass={game.autoPass ?? false}
               isHost={room.hostId === myId}
               onError={notify}
             />
@@ -162,6 +191,18 @@ export default function App() {
       </footer>
 
       {toast && <div className="toast">{toast}</div>}
+
+      {announce && (
+        <div className={`announce announce--${announce.kind}`} role="status">
+          <span className="announce__who">{announce.nickname}</span>
+          <strong className="announce__what">
+            {announce.kind === 'grand' ? '그랜드 티츄!' : '티츄!'}
+          </strong>
+          <span className="announce__sub">
+            {announce.kind === 'grand' ? '성공 +200 / 실패 −200' : '성공 +100 / 실패 −100'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
