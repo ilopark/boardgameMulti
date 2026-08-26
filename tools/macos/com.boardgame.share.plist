@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  맥에서 보드게임 서버 + Cloudflare Tunnel을 자동으로 띄우는 설정.
+
+  설치:
+    cp tools/macos/com.boardgame.share.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.boardgame.share.plist
+
+  해제:
+    launchctl unload ~/Library/LaunchAgents/com.boardgame.share.plist
+    rm ~/Library/LaunchAgents/com.boardgame.share.plist
+
+  로그(여기에 공개 링크가 찍힌다):
+    tail -f ~/Library/Logs/boardgame.log
+
+  ※ WorkingDirectory 경로는 실제 프로젝트 위치에 맞게 고칠 것.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.boardgame.share</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <!-- caffeinate: 이게 도는 동안 맥이 잠들지 않는다 -->
+    <string>exec caffeinate -i npm run share</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/ilo/dev/boardgame</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/ilo/Library/Logs/boardgame.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ilo/Library/Logs/boardgame.log</string>
+</dict>
+</plist>
