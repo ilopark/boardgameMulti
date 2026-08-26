@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 
 interface Props {
-  /** 서버가 알려준 남은 시간(ms). 값이 바뀌면 다시 센다 */
+  /** 서버가 알려준 남은 시간(ms) */
   remainingMs: number | null
+  /**
+   * 메시지 일련번호. **같은 remainingMs가 다시 와도 카운트다운을 재시작**하려면 필요하다.
+   * 이게 없으면 단계가 바뀌어도 값이 같을 때 이전 카운트다운이 그대로 이어져서
+   * 30초짜리 단계가 3초로 보이는 일이 생긴다.
+   */
+  seq?: number
   /** 전체 제한시간 — 진행바 비율 계산용 */
   totalMs: number
   label?: string
@@ -13,7 +19,7 @@ interface Props {
  * 남은 시간 카운트다운.
  * 서버는 "남은 ms"만 보내고 시각 계산은 여기서 한다 — 클라이언트 시계가 어긋나도 안 틀어진다.
  */
-export default function Countdown({ remainingMs, totalMs, label, urgentUnder = 10 }: Props) {
+export default function Countdown({ remainingMs, totalMs, label, seq, urgentUnder = 10 }: Props) {
   const [left, setLeft] = useState(remainingMs ?? 0)
 
   useEffect(() => {
@@ -26,7 +32,7 @@ export default function Countdown({ remainingMs, totalMs, label, urgentUnder = 1
       if (next === 0) clearInterval(id)
     }, 200)
     return () => clearInterval(id)
-  }, [remainingMs])
+  }, [remainingMs, seq])
 
   if (remainingMs === null) return null
 

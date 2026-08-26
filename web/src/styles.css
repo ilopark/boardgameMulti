@@ -25,7 +25,7 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  max-width: 1040px;
+  max-width: 1320px;
   margin: 0 auto;
   width: 100%;
 }
@@ -451,3 +451,124 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .opt--on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .opt:disabled { opacity: 0.5; }
 .opt--on:disabled { opacity: 0.85; }
+
+/* ─────────── 티츄 ─────────── */
+
+/* 팀 점수 */
+.teamscore { display: flex; align-items: center; gap: 10px; }
+.teamscore__t { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.teamscore__t em { font-style: normal; font-size: 10px; color: var(--muted); }
+.teamscore__t b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.teamscore__t.is-mine b { color: var(--accent); }
+.teamscore__vs { font-size: 12px; color: var(--muted); }
+
+/* 플레이어 줄 */
+.tseats { display: flex; flex-direction: column; gap: 6px; }
+.seatrow {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 12px; padding: 10px 16px;
+  min-height: 112px;
+}
+.seatrow--team0 { border-left-color: #4f8cff; }
+.seatrow--team1 { border-left-color: #f0a33d; }
+.seatrow.is-me { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.seatrow.is-active { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.seatrow.is-leading { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+.seatrow__who { width: 190px; flex: none; display: flex; flex-direction: column; gap: 3px; }
+.seatrow__name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.seatrow__meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.seatrow__count { font-style: normal; font-size: 11px; color: var(--muted); }
+
+.decl {
+  font-style: normal; font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+}
+.decl--small { background: #3a5bbf; color: #fff; }
+.decl--grand { background: #b8442f; color: #fff; }
+
+.seatrow__play { flex: 1; min-width: 0; overflow-x: auto; }
+.seatrow__cards { display: flex; gap: 4px; align-items: center; }
+.seatrow__cards--pass { gap: 8px; opacity: 0.75; }
+.passlabel { font-size: 12px; color: var(--muted); }
+
+.wishbar {
+  margin: 0; padding: 9px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--warn) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line));
+  font-size: 13px;
+}
+
+/* 티츄 카드 */
+.tcard {
+  position: relative; flex: none; display: block;
+  padding: 0; border: none; background: none;
+  border-radius: 7px; overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  line-height: 0;
+}
+.tcard--lg { width: 82px; height: 125px; }
+.tcard--md { width: 64px; height: 98px; }
+.tcard--sm { width: 50px; height: 76px; }
+.tcard__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tcard__text {
+  display: grid; place-items: center; width: 100%; height: 100%;
+  background: var(--surface-2); color: var(--text);
+  font-size: 12px; line-height: 1.2; text-align: center;
+}
+.tcard--back { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.tcard__as {
+  position: absolute; bottom: 3px; right: 3px;
+  background: var(--accent); color: #fff;
+  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px;
+  line-height: 1.4;
+}
+.tcard.is-clickable { cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
+.tcard.is-clickable:hover:not(:disabled) { transform: translateY(-10px); z-index: 5; }
+.tcard.is-selected { transform: translateY(-18px); box-shadow: 0 0 0 3px var(--accent), 0 10px 18px rgba(0,0,0,.5); z-index: 6; }
+.tcard.is-dim { opacity: 0.4; cursor: not-allowed; }
+
+/* 손패는 겹치지 않고 일자로. 14장이 한 줄에 다 들어가도록 폭을 잡았다.
+   좁은 화면에서는 가로 스크롤로 넘어간다. */
+.hand .handrow { padding-top: 26px; padding-bottom: 12px; gap: 5px; }
+
+.handactions { display: flex; align-items: center; gap: 8px; }
+.tichubtn {
+  background: #3a5bbf; color: #fff; font-weight: 700; font-size: 13px;
+  padding: 7px 14px; border: none;
+}
+.grandbtn { background: #b8442f; color: #fff; font-weight: 700; border: none; }
+.bombbtn { background: #c0392b; color: #fff; font-weight: 700; border: none; }
+
+.playbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding-top: 10px;
+}
+.playbar__info { font-size: 13px; color: var(--muted); }
+.playbar__warn { color: var(--warn); }
+.playbar__bomb { color: #ff7a6b; font-weight: 700; }
+.playbar__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 카드 교환 슬롯 */
+.passslots { display: flex; gap: 12px; flex-wrap: wrap; }
+.passslot {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 8px 12px; border-radius: 10px;
+  border: 1px dashed var(--line); background: var(--surface-2);
+}
+.passslot.is-filled { border-style: solid; border-color: var(--accent); }
+.passslot__label { font-size: 11px; color: var(--muted); text-align: center; display: flex; flex-direction: column; }
+.passslot__label em { font-style: normal; color: var(--text); font-size: 12px; font-weight: 600; }
+.passslot__empty { width: 62px; height: 95px; border-radius: 7px; background: var(--bg); }
+
+.wishgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.bonuslist .miss { color: var(--warn); }
+
+@media (max-width: 760px) {
+  .seatrow { flex-direction: column; align-items: stretch; gap: 8px; }
+  .seatrow__who { width: auto; flex-direction: row; justify-content: space-between; align-items: center; }
+  .tcard--lg { width: 70px; height: 107px; }
+}

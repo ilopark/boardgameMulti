@@ -60,6 +60,37 @@ export interface TichuPlayerView {
   lastRound: RoundScore | null
 }
 
+/**
+ * 손패 정렬 순서 — **왼쪽이 약하고 오른쪽이 강하게.**
+ * 개 → 마작(1) → 숫자 2~A (같은 값은 문양 순) → 봉황 → 용
+ * 개는 아무 트릭도 못 잡으므로 가장 왼쪽.
+ */
+const SUIT_ORDER: Record<string, number> = { jade: 0, sword: 1, pagoda: 2, star: 3 }
+
+function sortKey(card: TichuCard): [number, number] {
+  switch (card.kind) {
+    case 'dog':
+      return [0, 0]
+    case 'mahjong':
+      return [1, 0]
+    case 'number':
+      return [card.rank, SUIT_ORDER[card.suit] ?? 0]
+    case 'phoenix':
+      return [15, 0]
+    case 'dragon':
+      return [16, 0]
+  }
+}
+
+/** 손패는 항상 정렬해서 보낸다 — 매번 눈으로 찾지 않아도 되게 */
+export function sortHand(cards: readonly TichuCard[]): TichuCard[] {
+  return [...cards].sort((a, b) => {
+    const [ar, as_] = sortKey(a)
+    const [br, bs] = sortKey(b)
+    return ar - br || as_ - bs
+  })
+}
+
 export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
   const lastPlayBySeat = new Map<number, Combo>()
   for (const p of state.trick) lastPlayBySeat.set(p.seat, p.combo)
@@ -90,7 +121,7 @@ export function viewFor(state: TichuGameState, seat: number): TichuPlayerView {
     phase: state.phase,
     round: state.round,
     targetScore: state.opts.targetScore,
-    hand: [...(state.hands[seat] ?? [])],
+    hand: sortHand(state.hands[seat] ?? []),
     seats,
     waitingFor: waitingSeats(state),
     turn: state.turn,

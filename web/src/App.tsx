@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { GAME_LABEL, type GameId, type RoomPublic, type skullking } from '@bg/core'
+import { GAME_LABEL, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
 import { clearIdentity, loadIdentity, request, saveIdentity, socket } from './socket.js'
 import Lobby from './Lobby.js'
 import RoomView from './RoomView.js'
 import GameView from './game/GameView.js'
+import TichuGameView from './game/TichuGameView.js'
 import CardGallery from './game/CardGallery.js'
 
 type SkView = skullking.SkPlayerView
@@ -12,9 +13,15 @@ type SkView = skullking.SkPlayerView
 const IS_GALLERY = typeof location !== 'undefined' && new URLSearchParams(location.search).has('cards')
 
 interface GameMsg {
-  view: SkView
+  view: unknown
   remainingMs: number | null
   waitingFor: number[]
+  /**
+   * 메시지마다 증가하는 번호.
+   * 서버가 같은 remainingMs를 다시 보내면 React가 "값이 안 바뀌었다"고 보고
+   * 카운트다운을 재시작하지 않는다. 그래서 별도의 신호를 하나 준다.
+   */
+  seq: number
 }
 
 export default function App() {
@@ -37,7 +44,9 @@ export default function App() {
       // 대기실로 돌아오면 게임 화면을 치운다
       if (next.phase === 'lobby') setGame(null)
     }
-    const onGameView = (msg: unknown) => setGame(msg as GameMsg)
+    let seq = 0
+    const onGameView = (msg: unknown) =>
+      setGame({ ...(msg as Omit<GameMsg, 'seq'>), seq: ++seq })
     const onClosed = ({ reason }: { reason: string }) => {
       notify(reason)
       setRoom(null)
@@ -121,14 +130,26 @@ export default function App() {
       <main className="main">
         {IS_GALLERY && <CardGallery />}
         {IS_GALLERY ? null : room && myId && game && room.phase !== 'lobby' ? (
-          <GameView
-            room={room}
-            view={game.view}
-            remainingMs={game.remainingMs}
-            waitingFor={game.waitingFor}
-            isHost={room.hostId === myId}
-            onError={notify}
-          />
+          room.game === 'tichu' ? (
+            <TichuGameView
+              room={room}
+              view={game.view as tichu.TichuPlayerView}
+              remainingMs={game.remainingMs}
+              seq={game.seq}
+              isHost={room.hostId === myId}
+              onError={notify}
+            />
+          ) : (
+            <GameView
+              room={room}
+              view={game.view as SkView}
+              remainingMs={game.remainingMs}
+              waitingFor={game.waitingFor}
+              seq={game.seq}
+              isHost={room.hostId === myId}
+              onError={notify}
+            />
+          )
         ) : room && myId ? (
           <RoomView room={room} myId={myId} onLeave={handleLeave} onError={notify} />
         ) : (

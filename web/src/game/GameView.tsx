@@ -20,12 +20,13 @@ interface Props {
   room: RoomPublic
   view: View
   remainingMs: number | null
+  seq: number
   waitingFor: number[]
   isHost: boolean
   onError: (message: string) => void
 }
 
-export default function GameView({ room, view, remainingMs, waitingFor, isHost, onError }: Props) {
+export default function GameView({ room, view, remainingMs, waitingFor, seq, isHost, onError }: Props) {
   const [busy, setBusy] = useState(false)
   const [tigressPick, setTigressPick] = useState<SkCard | null>(null)
 
@@ -85,6 +86,7 @@ export default function GameView({ room, view, remainingMs, waitingFor, isHost, 
         nameOf={nameOf}
         remainingMs={remainingMs}
         totalMs={totalMs}
+        seq={seq}
       />
 
       <PlayerBoard room={room} view={view} nameOf={nameOf} waitingFor={waitingFor} />
@@ -170,6 +172,7 @@ function TurnBanner({
   nameOf,
   remainingMs,
   totalMs,
+  seq,
 }: {
   view: View
   myTurn: boolean
@@ -178,6 +181,7 @@ function TurnBanner({
   nameOf: (seat: number) => string
   remainingMs: number | null
   totalMs: number
+  seq: number
 }) {
   let tone: 'me' | 'wait' | 'info' = 'info'
   let title = ''
@@ -219,7 +223,7 @@ function TurnBanner({
         <strong>{title}</strong>
         {sub && <span>{sub}</span>}
       </div>
-      <Countdown remainingMs={remainingMs} totalMs={totalMs} />
+      <Countdown remainingMs={remainingMs} totalMs={totalMs} seq={seq} />
     </section>
   )
 }

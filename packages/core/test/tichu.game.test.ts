@@ -437,3 +437,31 @@ describe('뷰 마스킹', () => {
     expect(viewFor(g, 1).dragonTargets).toEqual([])
   })
 })
+
+describe('손패 정렬', () => {
+  it('왼쪽이 약하고 오른쪽이 강하다: 개 → 마작 → 숫자 → 봉황 → 용', async () => {
+    const { sortHand } = await import('../src/tichu/view.js')
+    const cards = [dragon, c('star', 7), dog, mahjong, phoenix, c('jade', 3), c('sword', 14)]
+    expect(sortHand(cards).map((x) => x.kind === 'number' ? `${x.rank}` : x.kind))
+      .toEqual(['dog', 'mahjong', '3', '7', '14', 'phoenix', 'dragon'])
+  })
+
+  it('같은 숫자는 문양 순으로 묶인다', async () => {
+    const { sortHand } = await import('../src/tichu/view.js')
+    const cards = [c('star', 5), c('jade', 5), c('pagoda', 5), c('sword', 5)]
+    expect(sortHand(cards).map((x) => (x.kind === 'number' ? x.suit : ''))).toEqual([
+      'jade', 'sword', 'pagoda', 'star',
+    ])
+  })
+
+  it('뷰로 나가는 손패가 정렬돼 있다', async () => {
+    const { viewFor } = await import('../src/tichu/view.js')
+    const g = toPlaying()
+    const hand = viewFor(g, 0).hand
+    const key = (x: typeof hand[number]) =>
+      x.kind === 'dog' ? 0 : x.kind === 'mahjong' ? 1 : x.kind === 'number' ? x.rank : x.kind === 'phoenix' ? 15 : 16
+    for (let i = 1; i < hand.length; i++) {
+      expect(key(hand[i]!)).toBeGreaterThanOrEqual(key(hand[i - 1]!))
+    }
+  })
+})

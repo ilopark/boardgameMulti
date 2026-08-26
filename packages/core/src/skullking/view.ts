@@ -56,6 +56,36 @@ export interface SkPlayerView {
   history: SeatRoundScore[][]
 }
 
+/**
+ * 손패 정렬 순서.
+ * 색깔별로 묶고(초록·노랑·보라·검정) 각 색은 숫자 오름차순,
+ * 그 뒤에 특수카드를 약한 것부터 놓는다.
+ */
+const COLOR_ORDER: Record<string, number> = { green: 0, yellow: 1, purple: 2, black: 3 }
+const SPECIAL_ORDER: Record<string, number> = {
+  escape: 0,
+  loot: 1,
+  tigress: 2,
+  kraken: 3,
+  whitewhale: 4,
+  mermaid: 5,
+  pirate: 6,
+  skullking: 7,
+}
+
+/** 손패는 항상 정렬해서 보낸다 — 매번 눈으로 찾지 않아도 되게 */
+export function sortHand(cards: readonly SkCard[]): SkCard[] {
+  return [...cards].sort((a, b) => {
+    const ag = a.kind === 'number' ? 0 : 1
+    const bg = b.kind === 'number' ? 0 : 1
+    if (ag !== bg) return ag - bg
+    if (a.kind === 'number' && b.kind === 'number') {
+      return (COLOR_ORDER[a.color] ?? 0) - (COLOR_ORDER[b.color] ?? 0) || a.rank - b.rank
+    }
+    return (SPECIAL_ORDER[a.kind] ?? 0) - (SPECIAL_ORDER[b.kind] ?? 0)
+  })
+}
+
 export function viewFor(state: SkGameState, seat: number): SkPlayerView {
   const slots = state.hands.length
   const ghost = hasGhost(state.opts, state.humanCount)
@@ -72,7 +102,7 @@ export function viewFor(state: SkGameState, seat: number): SkPlayerView {
     dealer: dealerForRound(state.initialDealer, state.roundIndex, state.humanCount),
     leader: state.leader,
     currentSeat: currentSeat(state),
-    hand: [...(state.hands[seat] ?? [])],
+    hand: sortHand(state.hands[seat] ?? []),
     legal: legalFor(state, seat).map((c) => c.id),
     handCounts: Array.from({ length: slots }, (_, i) => state.hands[i]?.length ?? 0),
     myBid: state.bids[seat] ?? null,

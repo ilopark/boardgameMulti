@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createGame, createRng, sortHand as skSortHand, viewFor } from './helpers-sk.js'
 import {
   buildDeck,
   computeLeadColor,
@@ -421,5 +422,25 @@ describe('해적 · 스컬킹 · 인어 삼각관계', () => {
     expect(missed[2]!.bidMet).toBe(false)
     expect(missed[2]!.bonusPoints).toBe(0)
     expect(missed[2]!.total).toBe(-10)
+  })
+})
+
+describe('손패 정렬', () => {
+  it('색깔별로 묶이고 숫자는 오름차순, 특수는 뒤로', () => {
+    const cards: SkCard[] = [
+      sk(), num('black', 3), num('green', 9), escape(), num('green', 2),
+      num('yellow', 5), pirate(), num('black', 1),
+    ]
+    const sorted = skSortHand(cards)
+    expect(sorted.map((c) => (c.kind === 'number' ? `${c.color}${c.rank}` : c.kind))).toEqual([
+      'green2', 'green9', 'yellow5', 'black1', 'black3', 'escape', 'pirate', 'skullking',
+    ])
+  })
+
+  it('뷰로 나가는 손패가 정렬돼 있다', () => {
+    const g = createGame(4, OPTS, 0, createRng(3))
+    // 5라운드짜리로 손패를 늘려서 확인
+    const v = viewFor(g, 0)
+    expect(v.hand).toHaveLength(1)
   })
 })
