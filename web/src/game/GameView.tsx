@@ -182,10 +182,13 @@ function Status({
   let sub = ''
 
   if (view.phase === 'bidding') {
+    const iLead = view.leader === view.seat
     if (myBidPending) {
       tone = 'me'
       title = '입찰하세요'
-      sub = '몇 트릭 이길지 아래 숫자로 고르세요'
+      sub = iLead
+        ? '★ 당신이 선턴입니다 — 첫 카드를 리드해요. 몇 트릭 이길지 고르세요'
+        : `선턴: ${nameOf(view.leader)} · 몇 트릭 이길지 고르세요`
     } else {
       tone = 'wait'
       title = '입찰 대기 중'
@@ -259,7 +262,6 @@ function PlayerRail({
             <div className="railseat__body">
               <div className="railseat__namerow">
                 <span className="railseat__name">{nameOf(seat)}</span>
-                {view.dealer === seat && <em className="flagchip">딜러</em>}
                 {connected.get(seat) === false && <em className="flagchip flagchip--warn">끊김</em>}
               </div>
               <div className={met && view.bidsRevealed ? 'railseat__bw is-ok' : 'railseat__bw'}>
@@ -267,6 +269,14 @@ function PlayerRail({
                 <span>W: <b>{won}</b></span>
               </div>
             </div>
+            {view.leader === seat && (
+              <span className="railseat__lead" title="선턴 — 첫 카드를 리드합니다" aria-label="선턴">
+                <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+                  <path d="M5 3l15 9-15 9V3z" fill="currentColor" />
+                </svg>
+                <b>선</b>
+              </span>
+            )}
             <span className="railseat__score">{view.totals[seat] ?? 0}</span>
           </div>
         )
@@ -301,7 +311,7 @@ function Bidding({
   const done = view.myBid !== null
 
   return (
-    <section className="panel">
+    <section className="panel bidpanel">
       <div className="panel__head">
         <h2>트릭 선택</h2>
         <span className="muted">이번 라운드에 몇 번 이길지 고르세요</span>
@@ -361,21 +371,6 @@ function TrickArea({ view, nameOf }: { view: View; nameOf: (seat: number) => str
               </div>
             )
           })}
-        </div>
-      )}
-      {outcome && (
-        <div className="outcome">
-          <strong>{outcome.destroyed ? '트릭 소멸' : `${nameOf(outcome.winner ?? -1)} 획득`}</strong>
-          <span className="muted"> — {outcome.reason}</span>
-          {outcome.bonuses.length > 0 && (
-            <ul className="bonuslist">
-              {outcome.bonuses.map((b, i) => (
-                <li key={i}>
-                  +{b.points} {b.detail}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </section>
@@ -498,10 +493,10 @@ function TigressModal({
         </p>
         <div className="modal__actions">
           <button type="button" className="primary" disabled={busy} onClick={() => onPick('pirate')}>
-            해적으로 (인어·숫자를 이김)
+            해적 (인어·숫자를 이김)
           </button>
           <button type="button" className="secondary" disabled={busy} onClick={() => onPick('escape')}>
-            도주로 (반드시 짐)
+            도주 (반드시 짐)
           </button>
           <button type="button" className="ghost" onClick={onCancel}>
             취소

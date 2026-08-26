@@ -516,6 +516,18 @@ button { letter-spacing: 0.02em; }
   background: var(--surface-2); color: var(--muted);
 }
 .flagchip--warn { color: var(--warn); }
+/* 선턴(리드) — 입찰 때도 누가 첫 카드를 내는지 한눈에 */
+/* 선턴 아이콘 — 좌석 우측 빈 공간에 크게. 다크/라이트 모두 또렷하게 */
+.railseat__lead {
+  flex: none;
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 5px 9px;
+  border-radius: 12px;
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.railseat__lead svg { display: block; }
+.railseat__lead b { font-size: 12px; font-weight: 900; line-height: 1; letter-spacing: 1px; }
 
 .tally { display: flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
 .tally__won { font-family: var(--font-display); font-size: 32px; font-weight: 400; line-height: 1; }
@@ -530,6 +542,11 @@ button { letter-spacing: 0.02em; }
 
 /* 입찰 */
 .bidrow { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 입찰 영역은 '입찰하세요' 제목·카운트다운 아래 가운데 정렬 */
+.bidpanel { text-align: center; }
+.bidpanel .panel__head { flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.bidpanel .bidrow { justify-content: center; }
+.bidpanel > p { max-width: 620px; margin-left: auto; margin-right: auto; }
 .bid {
   min-width: 52px; height: 50px;
   background: var(--surface-2); border: 1px solid var(--line);
@@ -584,12 +601,15 @@ button { letter-spacing: 0.02em; }
   padding-bottom: 16%;
 }
 .pcard__svg { width: 62%; height: 62%; color: var(--pcard-art); }
-/* 그림 파일(완성 카드)일 때는 크림색 테두리·색 패널을 걷어내고 그림이 카드 전체를 꽉 채운다 */
-.pcard.has-image { padding: 0; background: none; }
+/* 그림 카드는 사방에 동일한 흰 여백(테두리)을 둔다.
+   inset 을 고정 px로 줘서 원본 이미지 크기가 제각각이어도 네 변(좌·우·상·하) 여백 폭이 모두 같다. */
+.pcard.has-image { padding: 0; background: #ffffff; }
 .pcard.has-image::before { display: none; }
-.pcard.has-image .pcard__art { inset: 0; padding-bottom: 0; }
+.pcard.has-image .pcard__art { inset: 5px; padding-bottom: 0; }
 .pcard__img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-sm); }
-.pcard.has-image .pcard__img { border-radius: var(--r); }
+.pcard.has-image .pcard__img { border-radius: 2px; }
+.pcard--lg.has-image .pcard__art { inset: 6px; }
+.pcard--sm.has-image .pcard__art { inset: 3px; }
 .pcard--lg .pcard__svg { width: 60%; height: 60%; }
 
 .pcard__rank {
@@ -658,8 +678,6 @@ button { letter-spacing: 0.02em; }
 .leadhint--purple { color: #c39bf0; }
 .leadhint--black { color: #d7d9e0; }
 
-.outcome { border-top: 1px solid var(--line); padding-top: 10px; font-size: 14px; }
-.bonuslist { margin: 6px 0 0; padding-left: 18px; color: var(--ok); font-size: 13px; }
 
 /* 손패 — 가로 스크롤 */
 .hand--active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -705,11 +723,13 @@ button { letter-spacing: 0.02em; }
 .rank__score { color: var(--accent); font-weight: 700; }
 
 /* 모달 */
-.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); display: grid; place-items: center; padding: 20px; z-index: 20; }
+/* 반드시 골라야 하는 모달들(봉황·티그리스·소원)은 배경을 흐리게 하지 않고, 박스는 완전 불투명 */
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.12); display: grid; place-items: center; padding: 20px; z-index: 20; }
 .modal__box {
-  background: var(--surface); border: 1px solid var(--line);
+  background: var(--bg); border: 1px solid var(--line);
   border-radius: var(--r-lg); padding: 20px; max-width: 360px; width: 100%;
   display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
 }
 .modal__box h2 { margin: 0; font-size: 16px; }
 .tigress__timer {
