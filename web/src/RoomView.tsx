@@ -51,6 +51,7 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
 
   const minPlayers = MIN_PLAYERS[room.game]
   const allReady = seated.length >= minPlayers && seated.every((p) => p.ready)
+  const hasFreeSeat = seated.length < room.seatCount
 
   // 딜러 왼쪽 사람이 그 라운드 선턴
   const leaderSeat =
@@ -93,12 +94,25 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
                   <span className="seatname">{p ? p.nickname : '빈자리'}</span>
                   <span className="seatflags">
                     {p?.id === room.hostId && <em className="tag">방장</em>}
+                    {p?.isBot && <em className="tag">봇</em>}
                     {p && room.dealerSeat === seat && <em className="tag">딜러</em>}
                     {p && leaderSeat === seat && <em className="tag tag--lead">선턴</em>}
-                    {p && !p.connected && <em className="tag tag--warn">끊김</em>}
-                    {p?.ready && room.phase === 'lobby' && <em className="tag tag--ok">준비</em>}
+                    {p && !p.isBot && !p.connected && <em className="tag tag--warn">끊김</em>}
+                    {p?.ready && !p.isBot && room.phase === 'lobby' && <em className="tag tag--ok">준비</em>}
                   </span>
                 </button>
+                {isHost && room.phase === 'lobby' && p?.isBot && (
+                  <button
+                    type="button"
+                    className="seat__kick"
+                    disabled={busy}
+                    title="봇 내보내기"
+                    aria-label={`${p.nickname} 내보내기`}
+                    onClick={() => void run(() => request('room:removeBot', { playerId: p.id }))}
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             )
           })}
@@ -113,15 +127,27 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
             라운드마다 딜러가 한 칸씩 옮겨갑니다.
           </p>
         )}
-        {isHost && room.phase === 'lobby' && seated.length > 1 && (
-          <button
-            type="button"
-            className="secondary"
-            disabled={busy}
-            onClick={() => void run(() => request('room:shuffle', {}))}
-          >
-            자리 섞기
-          </button>
+        {isHost && room.phase === 'lobby' && (
+          <div className="lobbytools">
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy || !hasFreeSeat}
+              onClick={() => void run(() => request('room:addBot', {}))}
+            >
+              봇 추가
+            </button>
+            {seated.length > 1 && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => void run(() => request('room:shuffle', {}))}
+              >
+                자리 섞기
+              </button>
+            )}
+          </div>
         )}
       </section>
 

@@ -14,6 +14,8 @@ export interface PlayerPublic {
   seat: number | null
   connected: boolean
   ready: boolean
+  /** 방장이 추가한 봇. 서버가 자동으로 대신 행동한다. */
+  isBot: boolean
 }
 
 export interface RoomPublic {
@@ -44,6 +46,18 @@ export interface Identity {
   token: string
 }
 
+/** 방 안에서만 오가는 채팅 한 줄. 저장하지 않고 방이 사라지면 함께 사라진다. */
+export interface ChatMessage {
+  id: string
+  /** 보낸 사람 영속 ID (내 메시지 구분용) */
+  playerId: string
+  nickname: string
+  seat: number | null
+  text: string
+  /** 서버 기준 시각(epoch ms) */
+  ts: number
+}
+
 /** 클라이언트 → 서버 */
 export interface ClientToServer {
   'room:create': (p: { nickname: string; game: GameId }, cb: (r: Ack<{ room: RoomPublic; identity: Identity }>) => void) => void
@@ -55,6 +69,12 @@ export interface ClientToServer {
   'room:start': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   /** 방장이 자리를 무작위로 섞는다. 입장 순서가 그대로 굳는 걸 막기 위한 것. */
   'room:shuffle': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 같은 방 사람들에게만 채팅을 보낸다 */
+  'chat:send': (p: { text: string }, cb: (r: Ack<null>) => void) => void
+  /** 방장이 빈자리에 봇을 추가한다. 봇은 서버가 자동으로 대신 행동한다. */
+  'room:addBot': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 방장이 봇을 내보낸다 */
+  'room:removeBot': (p: { playerId: string }, cb: (r: Ack<null>) => void) => void
 
   // ── 게임 진행 ──
   'game:bid': (p: { value: number }, cb: (r: Ack<null>) => void) => void
@@ -74,6 +94,10 @@ export interface ClientToServer {
     cb: (r: Ack<null>) => void,
   ) => void
   'tichu:pass': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 폭탄 창구에서 "폭탄 내기" 예약 — 진행을 멈추고 제출 시간을 받는다 */
+  'tichu:claimBomb': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 폭탄 예약 취소 */
+  'tichu:cancelBomb': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   /**
    * 이번 라운드 동안 자동으로 패스한다. 언제든 꺼서 취소할 수 있다.
    * 리드해야 하거나 마작 소원을 이행해야 하면 자동으로 풀린다.
@@ -99,6 +123,8 @@ export interface ServerToClient {
    */
   'game:announce': (p: { kind: 'tichu' | 'grand'; seat: number; nickname: string }) => void
   'room:closed': (p: { reason: string }) => void
+  /** 같은 방 사람들에게만 전달되는 채팅 */
+  'chat:message': (p: ChatMessage) => void
   /** 서버가 판단한 에러를 토스트로 띄우기 위한 채널 */
   'error:toast': (p: { message: string }) => void
 }

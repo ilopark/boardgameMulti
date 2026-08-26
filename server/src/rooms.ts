@@ -21,6 +21,8 @@ export interface Player {
   ready: boolean
   /** 연결이 끊긴 시각. 일정 시간 지나면 방에서 제거 */
   disconnectedAt: number | null
+  /** 방장이 추가한 봇이면 true. 서버가 자동으로 대신 행동한다. */
+  isBot: boolean
 }
 
 export interface Room {
@@ -42,6 +44,8 @@ export interface Room {
   tichuAutoPass: boolean[]
   /** trickEnd/roundEnd 자동 진행 타이머 */
   advanceTimer: NodeJS.Timeout | null
+  /** 봇 차례가 오면 잠깐 뒤에 대신 행동하는 타이머 */
+  botTimer: NodeJS.Timeout | null
   /** 제한시간 초과 시 대신 행동해 주는 타이머 */
   turnTimer: NodeJS.Timeout | null
   /** 지금 턴의 마감 시각(epoch ms). 없으면 null */
@@ -83,6 +87,7 @@ export function createRoom(game: GameId, defaultOptions: Record<string, unknown>
     seatArrangement: null,
     tichuAutoPass: [false, false, false, false],
     advanceTimer: null,
+    botTimer: null,
     turnTimer: null,
     turnDeadline: null,
     rng: null,
@@ -109,10 +114,43 @@ export function addPlayer(room: Room, nickname: string): Player {
     socketId: null,
     ready: false,
     disconnectedAt: null,
+    isBot: false,
   }
   room.players.set(player.id, player)
   if (!room.hostId) room.hostId = player.id
   return player
+}
+
+const BOT_NAMES = ['봇하나', '봇둘', '봇셋', '봇넷', '봇다섯']
+
+/**
+ * 빈자리에 봇을 앉힌다. 방장이 대기실에서 버튼으로 추가한다.
+ * 봇은 소켓이 없고 항상 준비 상태이며, 게임 중엔 서버가 대신 행동한다.
+ * 빈자리가 없으면 null.
+ */
+export function addBot(room: Room): Player | null {
+  const seat = firstFreeSeat(room)
+  if (seat === null) return null
+  // 이미 있는 봇 이름과 겹치지 않게 고른다
+  const taken = new Set([...room.players.values()].map((p) => p.nickname))
+  let nickname = BOT_NAMES.find((n) => !taken.has(n))
+  if (!nickname) {
+    let n = 1
+    while (taken.has(`봇${n}`)) n++
+    nickname = `봇${n}`
+  }
+  const bot: Player = {
+    id: randomUUID(),
+    token: randomBytes(24).toString('base64url'),
+    nickname,
+    seat,
+    socketId: null,
+    ready: true,
+    disconnectedAt: null,
+    isBot: true,
+  }
+  room.players.set(bot.id, bot)
+  return bot
 }
 
 /** 비어 있는 가장 앞자리 */
@@ -135,6 +173,7 @@ export function toPublic(room: Room): RoomPublic {
     seat: p.seat,
     connected: p.socketId !== null,
     ready: p.ready,
+    isBot: p.isBot,
   }))
   return {
     code: room.code,
@@ -148,11 +187,12 @@ export function toPublic(room: Room): RoomPublic {
   }
 }
 
-/** 호스트가 나가면 남은 사람 중 먼저 들어온 사람에게 넘긴다 */
+/** 호스트가 나가면 남은 **사람**(봇 제외) 중 먼저 들어온 사람에게 넘긴다 */
 export function reassignHostIfNeeded(room: Room): void {
   if (room.players.has(room.hostId)) return
-  const next = room.players.values().next()
-  room.hostId = next.done ? '' : next.value.id
+  // 봇은 방장이 될 수 없다 — 봇만 남으면 주인 없는 방이 되어 이후 정리된다
+  const human = [...room.players.values()].find((p) => !p.isBot)
+  room.hostId = human ? human.id : ''
 }
 
 /** 끊긴 지 오래된 플레이어와 빈 방 정리 */
@@ -205,7 +245,8 @@ export function shuffleSeats(room: Room): void {
   }
   seated.forEach((p, i) => {
     p.seat = seats[i]!
-    p.ready = false // 자리가 바뀌었으니 준비는 초기화
+    // 자리가 바뀌었으니 준비는 초기화한다. 단, 봇은 늘 준비 상태를 유지한다.
+    p.ready = p.isBot
   })
 }
 
