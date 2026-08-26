@@ -89,6 +89,34 @@ export function cardLabel(card: SkCard): string {
   }
 }
 
+/**
+ * 카드 그림.
+ *
+ * `src/assets/cards/` 에 파일을 넣으면 자동으로 쓰이고, 없으면 SVG 문장으로 폴백한다.
+ * **빌드 시점에 실제로 있는 파일만 등록**되므로, 그림이 없을 때 404 요청이 나가지 않는다.
+ *
+ * 파일 이름 규칙 (png/jpg/webp 아무거나):
+ *   숫자카드 — 문양당 한 장이면 된다. green / yellow / purple / black
+ *   특수카드 — escape / pirate / mermaid / skullking / tigress / loot / kraken / whitewhale
+ *   해적을 개별로 주고 싶으면 pirate-rosie 처럼. 없으면 pirate 를 공용으로 쓴다.
+ */
+const CARD_IMAGES: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('../assets/cards/*.{png,jpg,jpeg,webp}', {
+      eager: true,
+      query: '?url',
+      import: 'default',
+    }) as Record<string, string>,
+  ).map(([path, url]) => [path.replace(/^.*\/(.+)\.\w+$/, '$1'), url]),
+)
+
+/** 이 카드에 쓸 그림. 없으면 undefined → SVG 문장으로 그린다. */
+function cardImage(card: SkCard): string | undefined {
+  if (card.kind === 'number') return CARD_IMAGES[card.color]
+  if (card.kind === 'pirate') return CARD_IMAGES[`pirate-${card.pirate}`] ?? CARD_IMAGES.pirate
+  return CARD_IMAGES[card.kind]
+}
+
 export type CardSize = 'sm' | 'md' | 'lg'
 
 interface Props {
@@ -106,10 +134,14 @@ export default function Card({ card, tigressAs, size = 'md', disabled, playable,
   // 특수카드는 종류별로 색을 다르게 준다. 전부 같은 색이면 손에서 구분이 안 된다.
   const suit = isNumber ? card.color : card.kind
 
+  const imgSrc = cardImage(card)
+  const useImage = imgSrc !== undefined
+
   const classes = [
     'pcard',
     `pcard--${size}`,
     `pcard--${suit}`,
+    useImage ? 'has-image' : '',
     disabled ? 'is-dim' : '',
     playable ? 'is-playable' : '',
     onClick ? 'is-clickable' : '',
@@ -120,7 +152,13 @@ export default function Card({ card, tigressAs, size = 'md', disabled, playable,
   const face = (
     <>
       <span className="pcard__art">
-        {isNumber ? suitArt(card.color, 'pcard__svg') : specialArt(card, 'pcard__svg')}
+        {useImage ? (
+          <img className="pcard__img" src={imgSrc} alt="" draggable={false} />
+        ) : isNumber ? (
+          suitArt(card.color, 'pcard__svg')
+        ) : (
+          specialArt(card, 'pcard__svg')
+        )}
       </span>
 
       {isNumber ? (

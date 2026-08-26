@@ -192,3 +192,37 @@ export function describeCombo(combo: Combo): string {
   const base = `${TYPE_LABEL[combo.type]} ${combo.length}장 (값 ${combo.rank})`
   return combo.phoenixAs !== undefined ? `${base} · 봉황=${combo.phoenixAs}` : base
 }
+
+/**
+ * 봉황을 몇 값으로 쓰느냐에 따라 만들어지는 **서로 다른** 조합들.
+ *
+ * 클라이언트가 이걸 보고 결과가 2개 이상이면 선택창을 띄운다.
+ * 1개면 그냥 낸다 — 매번 묻지 않기 위해서다.
+ * 봉황이 없거나 해석이 하나뿐이면 길이 1 이하의 배열이 나온다.
+ */
+export function phoenixOptions(cards: readonly TichuCard[]): Combo[] {
+  if (!cards.some((c) => c.kind === 'phoenix')) {
+    const only = parseCombo(cards)
+    return only ? [only] : []
+  }
+  // 단독 봉황은 직전 카드에 따라 값이 정해지므로 고를 게 없다
+  if (cards.length === 1) {
+    const only = parseCombo(cards)
+    return only ? [only] : []
+  }
+
+  const seen = new Map<string, Combo>()
+  for (let r = MAHJONG_RANK; r <= 14; r++) {
+    const combo = parseCombo(cards, { phoenixAs: r })
+    if (!combo) continue
+    // 결과가 같은 조합(같은 종류·장수·값)이면 하나로 친다
+    const key = `${combo.type}:${combo.length}:${combo.rank}`
+    if (!seen.has(key)) seen.set(key, combo)
+  }
+  return [...seen.values()].sort((a, b) => a.rank - b.rank)
+}
+
+/** 이 카드 묶음을 낼 때 봉황 값을 물어봐야 하는가 */
+export function needsPhoenixChoice(cards: readonly TichuCard[]): boolean {
+  return phoenixOptions(cards).length > 1
+}

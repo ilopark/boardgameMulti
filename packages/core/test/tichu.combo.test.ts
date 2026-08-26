@@ -169,3 +169,39 @@ describe('한글 조사 헬퍼', () => {
     expect(josa('마을', '으로로')).toBe('마을로')
   })
 })
+
+describe('봉황 해석 선택', () => {
+  it('봉황이 없으면 해석은 하나뿐', async () => {
+    const { phoenixOptions, needsPhoenixChoice } = await import('../src/tichu/combo.js')
+    const cards = [c('jade', 3), c('star', 4), c('sword', 5), c('pagoda', 6), c('jade', 7)]
+    expect(phoenixOptions(cards)).toHaveLength(1)
+    expect(needsPhoenixChoice(cards)).toBe(false)
+  })
+
+  it('단독 봉황은 값이 자동으로 정해지므로 묻지 않는다', async () => {
+    const { needsPhoenixChoice } = await import('../src/tichu/combo.js')
+    expect(needsPhoenixChoice([phoenix])).toBe(false)
+  })
+
+  it('2,3,4,5 + 봉황 → 1~5 / 2~6 두 가지 (물어봐야 함)', async () => {
+    const { phoenixOptions, needsPhoenixChoice } = await import('../src/tichu/combo.js')
+    const cards = [c('jade', 2), c('star', 3), c('sword', 4), c('pagoda', 5), phoenix]
+    const opts = phoenixOptions(cards)
+    expect(needsPhoenixChoice(cards)).toBe(true)
+    expect(opts.map((o) => o.rank)).toEqual([5, 6])
+    expect(opts.every((o) => o.type === 'straight')).toBe(true)
+  })
+
+  it('빈칸이 하나뿐이면 해석도 하나 (묻지 않음)', async () => {
+    const { phoenixOptions, needsPhoenixChoice } = await import('../src/tichu/combo.js')
+    // 2,3,_,5,6 → 봉황은 4밖에 될 수 없다
+    const cards = [c('jade', 2), c('star', 3), phoenix, c('sword', 5), c('pagoda', 6)]
+    expect(phoenixOptions(cards)).toHaveLength(1)
+    expect(needsPhoenixChoice(cards)).toBe(false)
+  })
+
+  it('페어는 값이 하나로 정해진다', async () => {
+    const { needsPhoenixChoice } = await import('../src/tichu/combo.js')
+    expect(needsPhoenixChoice([c('jade', 9), phoenix])).toBe(false)
+  })
+})

@@ -1,3 +1,6 @@
 export * from './types.js'
+export * from './teams.js'
+export * from './options.js'
 export * from './deck.js'
 export * from './combo.js'
+export * from './game.js'
