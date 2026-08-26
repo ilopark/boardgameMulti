@@ -17,7 +17,6 @@ export function buildDeck(opts: SkRuleOptions = DEFAULT_SK_OPTIONS): SkCard[] {
 
   if (opts.useTigress) deck.push({ id: 'tigress', kind: 'tigress' })
   if (opts.useMermaids) for (let i = 0; i < 2; i++) deck.push({ id: `mermaid-${i}`, kind: 'mermaid' })
-  if (opts.useLoot) for (let i = 0; i < 2; i++) deck.push({ id: `loot-${i}`, kind: 'loot' })
   if (opts.useKraken) deck.push({ id: 'kraken', kind: 'kraken' })
   if (opts.useWhiteWhale) deck.push({ id: 'whitewhale', kind: 'whitewhale' })
 

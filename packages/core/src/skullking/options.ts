@@ -10,7 +10,6 @@ export interface SkRuleOptions {
   maxRank: 13 | 14
   useTigress: boolean
   useMermaids: boolean
-  useLoot: boolean
   useKraken: boolean
   useWhiteWhale: boolean
   /**
@@ -38,7 +37,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
     maxRank: 13,
     useTigress: true,
     useMermaids: true,
-    useLoot: false,
     useKraken: false,
     useWhiteWhale: false,
     usePirateAbilities: false,
@@ -50,7 +48,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
       skCapturesPirate: 30,
       mermaidCapturesSk: 50,
       pirateCapturesMermaid: 0,
-      lootAlliance: 0,
     },
     roundCardCounts: DEFAULT_ROUNDS,
   },
@@ -59,7 +56,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
     maxRank: 14,
     useTigress: true,
     useMermaids: true,
-    useLoot: true,
     useKraken: true,
     useWhiteWhale: false,
     usePirateAbilities: false, // 미구현
@@ -71,7 +67,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
       skCapturesPirate: 30,
       mermaidCapturesSk: 50,
       pirateCapturesMermaid: 0,
-      lootAlliance: 20,
     },
     roundCardCounts: DEFAULT_ROUNDS,
   },
@@ -81,7 +76,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
     maxRank: 14,
     useTigress: true,
     useMermaids: true,
-    useLoot: true,
     useKraken: true,
     useWhiteWhale: true,
     usePirateAbilities: false, // 미구현
@@ -93,7 +87,6 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
       skCapturesPirate: 30,
       mermaidCapturesSk: 40,
       pirateCapturesMermaid: 20,
-      lootAlliance: 20,
     },
     roundCardCounts: DEFAULT_ROUNDS,
   },
@@ -108,12 +101,9 @@ export function makeSkOptions(patch: Partial<SkRuleOptions> = {}): SkRuleOptions
 
 /**
  * 사람 수에 맞춰 옵션을 보정한다.
- *
- * 2인에서 루트를 끄는 이유: 루트는 "낸 사람과 가져간 사람이 동맹"인데
- * 유령은 점수가 없어서 유령이 루트를 가져가면 동맹이 성립할 수 없다.
- * (공식 룰북에 2인 루트 사용 여부가 명시돼 있지 않아 우리 규칙으로 끈다)
+ * 지금은 사람 수에 따라 바꿀 규칙이 없어 그대로 돌려준다.
+ * (2인 변형에서 카드 구성을 조정할 여지를 남겨두는 훅)
  */
-export function optionsForPlayerCount(opts: SkRuleOptions, humanCount: number): SkRuleOptions {
-  if (humanCount !== 2) return opts
-  return { ...opts, useLoot: false }
+export function optionsForPlayerCount(opts: SkRuleOptions, _humanCount: number): SkRuleOptions {
+  return opts
 }

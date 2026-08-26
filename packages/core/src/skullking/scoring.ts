@@ -61,14 +61,6 @@ export function scoreRound(
       if (!bidMet[b.seat]) continue
       bonusBySeat[b.seat]!.push(b)
     }
-    // 루트 동맹은 양쪽 다 입찰 성공해야 지급
-    for (const [a, c] of trick.alliances) {
-      if (a < 0 || a >= seats || c < 0 || c >= seats) continue // 유령과는 동맹이 성립하지 않는다
-      if (!bidMet[a] || !bidMet[c]) continue
-      const pts = opts.bonuses.lootAlliance
-      bonusBySeat[a]!.push({ seat: a, kind: 'lootAlliance', points: pts, detail: `${c}번과 루트 동맹 성립` })
-      bonusBySeat[c]!.push({ seat: c, kind: 'lootAlliance', points: pts, detail: `${a}번과 루트 동맹 성립` })
-    }
   }
 
   return input.bids.map((bid, seat) => {

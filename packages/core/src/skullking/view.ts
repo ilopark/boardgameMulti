@@ -64,13 +64,12 @@ export interface SkPlayerView {
 const COLOR_ORDER: Record<string, number> = { green: 0, yellow: 1, purple: 2, black: 3 }
 const SPECIAL_ORDER: Record<string, number> = {
   escape: 0,
-  loot: 1,
-  tigress: 2,
-  kraken: 3,
-  whitewhale: 4,
-  mermaid: 5,
-  pirate: 6,
-  skullking: 7,
+  tigress: 1,
+  kraken: 2,
+  whitewhale: 3,
+  mermaid: 4,
+  pirate: 5,
+  skullking: 6,
 }
 
 /** 손패는 항상 정렬해서 보낸다 — 매번 눈으로 찾지 않아도 되게 */

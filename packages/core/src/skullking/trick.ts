@@ -31,8 +31,6 @@ export function effectiveKind(play: SkPlay): EffectiveKind {
     case 'tigress':
       // 선언 안 했으면 도주로 간주 (서버가 선언을 강제하므로 방어적 기본값)
       return play.tigressAs === 'pirate' ? 'pirate' : 'escape'
-    case 'loot':
-      return 'escape'
     default:
       return card.kind
   }
@@ -46,7 +44,7 @@ function isSuitPasser(play: SkPlay): boolean {
 
 /**
  * 리드색 결정.
- * 도주/루트/크라켄은 색 결정권을 다음 사람에게 넘긴다.
+ * 도주/크라켄은 색 결정권을 다음 사람에게 넘긴다.
  * 해적·인어·스컬킹·흰고래가 먼저 나오면 그 트릭엔 팔로우할 색이 없다.
  */
 export function computeLeadColor(plays: readonly SkPlay[]): SkColor | null {
@@ -139,7 +137,7 @@ function resolveRanking(plays: readonly SkPlay[], leadColor: SkColor | null): { 
     if (best >= 0) return { idx: best, reason: `리드색 최고 숫자 ${bestRank}` }
   }
 
-  // 전원 도주/루트
+  // 전원 도주
   return { idx: 0, reason: '전원 도주 — 먼저 낸 사람 승' }
 }
 
@@ -255,7 +253,6 @@ export function resolveTrick(
       destroyed: true,
       leadColor,
       bonuses: [],
-      alliances: [],
       reason: '크라켄이 트릭을 파괴 — 아무도 가져가지 않음',
     }
   }
@@ -264,23 +261,6 @@ export function resolveTrick(
   const winnerPlay = plays[idx]!
 
   const bonuses = collectBonuses(plays, idx, opts)
-  const alliances: Array<[number, number]> = []
-  if (opts.useLoot) {
-    for (const play of plays) {
-      if (play.card.kind !== 'loot') continue
-      if (play.seat === winnerPlay.seat) {
-        // 자기 루트를 자기가 먹음 — 동맹은 성립 안 하지만 보너스는 받음
-        bonuses.push({
-          seat: play.seat,
-          kind: 'lootAlliance',
-          points: opts.bonuses.lootAlliance,
-          detail: '자기 루트를 직접 획득 (동맹 없음)',
-        })
-      } else {
-        alliances.push([play.seat, winnerPlay.seat])
-      }
-    }
-  }
 
   return {
     winner: winnerPlay.seat,
@@ -288,7 +268,6 @@ export function resolveTrick(
     destroyed: false,
     leadColor,
     bonuses,
-    alliances,
     reason,
   }
 }

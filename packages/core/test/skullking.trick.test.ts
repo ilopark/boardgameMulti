@@ -7,7 +7,6 @@ import {
   hasGhost,
   legalPlays,
   makeSkOptions,
-  optionsForPlayerCount,
   resolveTrick,
   scoreRound,
   SK_PRESETS,
@@ -27,7 +26,6 @@ const pirate = (p: 'rosie' | 'bahij' | 'rascal' | 'juanita' | 'harry' = 'rosie')
 const mermaid = (i = 0): SkCard => ({ id: `mermaid-${i}`, kind: 'mermaid' })
 const sk = (): SkCard => ({ id: 'skullking', kind: 'skullking' })
 const tigress = (): SkCard => ({ id: 'tigress', kind: 'tigress' })
-const loot = (i = 0): SkCard => ({ id: `loot-${i}`, kind: 'loot' })
 const kraken = (): SkCard => ({ id: 'kraken', kind: 'kraken' })
 const whale = (): SkCard => ({ id: 'whitewhale', kind: 'whitewhale' })
 
@@ -35,10 +33,10 @@ const play = (seat: number, card: SkCard, tigressAs?: 'pirate' | 'escape'): SkPl
   tigressAs ? { seat, card, tigressAs } : { seat, card }
 
 describe('덱 구성', () => {
-  it('2021판은 74장', () => {
-    expect(buildDeck(SK_PRESETS.edition2021)).toHaveLength(74)
+  it('2021판은 72장 (루트 제외)', () => {
+    expect(buildDeck(SK_PRESETS.edition2021)).toHaveLength(72)
   })
-  it('클래식은 66장 (1-13, 루트·크라켄·흰고래 없음)', () => {
+  it('클래식은 66장 (1-13, 크라켄·흰고래 없음)', () => {
     expect(buildDeck(SK_PRESETS.classic)).toHaveLength(66)
   })
 })
@@ -167,16 +165,11 @@ describe('보너스 (2021판)', () => {
     expect(p2018).toHaveLength(0)
     expect(p2021).toHaveLength(2)
   })
-  it('루트는 낸 사람과 가져간 사람의 동맹을 만든다', () => {
-    const r = resolveTrick([play(0, num('green', 7)), play(1, loot()), play(2, num('green', 12))], OPTS)
-    expect(r.winner).toBe(2)
-    expect(r.alliances).toEqual([[1, 2]])
-  })
 })
 
 describe('점수 계산', () => {
-  const empty = { winner: null, nextLeader: 0, destroyed: true, leadColor: null, bonuses: [], alliances: [], reason: '' } as const
-  const won = (seat: number) => ({ winner: seat, nextLeader: seat, destroyed: false, leadColor: null, bonuses: [], alliances: [], reason: '' })
+  const empty = { winner: null, nextLeader: 0, destroyed: true, leadColor: null, bonuses: [], reason: '' } as const
+  const won = (seat: number) => ({ winner: seat, nextLeader: seat, destroyed: false, leadColor: null, bonuses: [], reason: '' })
 
   it('입찰 3 → 3트릭 = +60', () => {
     const s = scoreRound({ cardCount: 3, bids: [3, 0], tricks: [won(0), won(0), won(0)] }, OPTS)
@@ -209,16 +202,6 @@ describe('점수 계산', () => {
     const s = scoreRound({ cardCount: 2, bids: [0, 0], tricks: [empty, empty] }, OPTS)
     expect(s[0]!.total).toBe(20)
     expect(s[1]!.total).toBe(20)
-  })
-  it('루트 동맹은 양쪽 다 입찰 성공해야 지급', () => {
-    const t = { ...won(1), alliances: [[0, 1]] as Array<[number, number]> }
-    const ok = scoreRound({ cardCount: 1, bids: [0, 1], tricks: [t] }, OPTS)
-    expect(ok[0]!.bonusPoints).toBe(20)
-    expect(ok[1]!.bonusPoints).toBe(20)
-
-    const fail = scoreRound({ cardCount: 1, bids: [1, 1], tricks: [t] }, OPTS)
-    expect(fail[0]!.bonusPoints).toBe(0)
-    expect(fail[1]!.bonusPoints).toBe(0)
   })
 })
 
@@ -293,12 +276,6 @@ describe('2인 플레이 (Graybeard\'s Ghost)', () => {
     expect(hasGhost(OPTS, 2)).toBe(true)
     expect(hasGhost(OPTS, 3)).toBe(false)
     expect(hasGhost(makeSkOptions({ useGhostForTwoPlayers: false }), 2)).toBe(false)
-  })
-
-  it('2인에서는 루트를 빼서 덱이 2장 줄어든다', () => {
-    const two = optionsForPlayerCount(OPTS, 2)
-    expect(two.useLoot).toBe(false)
-    expect(buildDeck(two)).toHaveLength(buildDeck(OPTS).length - 2)
   })
 
   it('유령은 항상 두 번째로 낸다', () => {

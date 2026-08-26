@@ -15,7 +15,6 @@ export type SkCard =
   | { id: string; kind: 'mermaid' }
   | { id: string; kind: 'skullking' }
   | { id: string; kind: 'tigress' }
-  | { id: string; kind: 'loot' }
   | { id: string; kind: 'kraken' }
   | { id: string; kind: 'whitewhale' }
 
@@ -36,7 +35,6 @@ export type BonusKind =
   | 'skCapturesPirate'
   | 'mermaidCapturesSk'
   | 'pirateCapturesMermaid'
-  | 'lootAlliance'
 
 export interface BonusEvent {
   seat: number
@@ -56,8 +54,6 @@ export interface TrickOutcome {
   leadColor: SkColor | null
   /** 입찰 성공 시에만 실제 지급되는 보너스 후보 */
   bonuses: BonusEvent[]
-  /** 루트 동맹 [루트 낸 좌석, 트릭 가져간 좌석] — 양쪽 다 입찰 성공해야 지급 */
-  alliances: Array<[number, number]>
   /** 판정 근거. UI 툴팁 + 디버깅 */
   reason: string
 }

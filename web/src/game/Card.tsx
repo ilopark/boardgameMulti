@@ -5,7 +5,6 @@ import {
   EscapeArt,
   JollyRogerArt,
   KrakenArt,
-  LootArt,
   MapArt,
   MermaidArt,
   ParrotArt,
@@ -57,8 +56,6 @@ function specialArt(card: SkCard, className: string): JSX.Element {
       return <SkullKingArt className={className} />
     case 'tigress':
       return <TigressArt className={className} />
-    case 'loot':
-      return <LootArt className={className} />
     case 'kraken':
       return <KrakenArt className={className} />
     default:
@@ -80,8 +77,6 @@ export function cardLabel(card: SkCard): string {
       return '스컬킹'
     case 'tigress':
       return '티그리스'
-    case 'loot':
-      return '루트'
     case 'kraken':
       return '크라켄'
     case 'whitewhale':
@@ -97,7 +92,7 @@ export function cardLabel(card: SkCard): string {
  *
  * 파일 이름 규칙 (png/jpg/webp 아무거나):
  *   숫자카드 — 문양당 한 장이면 된다. green / yellow / purple / black
- *   특수카드 — escape / pirate / mermaid / skullking / tigress / loot / kraken / whitewhale
+ *   특수카드 — escape / pirate / mermaid / skullking / tigress / kraken / whitewhale
  *   해적을 개별로 주고 싶으면 pirate-rosie 처럼. 없으면 pirate 를 공용으로 쓴다.
  */
 const CARD_IMAGES: Record<string, string> = Object.fromEntries(
@@ -112,7 +107,8 @@ const CARD_IMAGES: Record<string, string> = Object.fromEntries(
 
 /** 이 카드에 쓸 그림. 없으면 undefined → SVG 문장으로 그린다. */
 function cardImage(card: SkCard): string | undefined {
-  if (card.kind === 'number') return CARD_IMAGES[card.color]
+  // 숫자카드는 색·숫자별로 완성된 카드 그림을 쓴다 (예: green_7.png). 없으면 색 공용(green.png)으로 폴백.
+  if (card.kind === 'number') return CARD_IMAGES[`${card.color}_${card.rank}`] ?? CARD_IMAGES[card.color]
   if (card.kind === 'pirate') return CARD_IMAGES[`pirate-${card.pirate}`] ?? CARD_IMAGES.pirate
   return CARD_IMAGES[card.kind]
 }
@@ -161,17 +157,21 @@ export default function Card({ card, tigressAs, size = 'md', disabled, playable,
         )}
       </span>
 
-      {isNumber ? (
-        <>
-          <span className="pcard__rank">{card.rank}</span>
-          <span className="pcard__suitname">{SUIT_NAME[card.color]}</span>
-        </>
-      ) : (
-        <span className="pcard__title">{cardLabel(card)}</span>
-      )}
+      {/* 실제 카드 그림이 있으면 숫자·이름이 그림에 이미 그려져 있으므로 오버레이를 그리지 않는다 */}
+      {!useImage &&
+        (isNumber ? (
+          <>
+            <span className="pcard__rank">{card.rank}</span>
+            <span className="pcard__suitname">{SUIT_NAME[card.color]}</span>
+          </>
+        ) : (
+          <span className="pcard__title">{cardLabel(card)}</span>
+        ))}
 
       {tigressAs && (
-        <span className="pcard__declared">{tigressAs === 'pirate' ? '해적으로' : '도주로'}</span>
+        <span className={`pcard__declared pcard__declared--${tigressAs}`}>
+          {tigressAs === 'pirate' ? '해적' : '도주'}
+        </span>
       )}
     </>
   )

@@ -161,17 +161,6 @@ export function TigressArt({ className }: ArtProps) {
   )
 }
 
-/** 루트 — 보석 (대칭) */
-export function LootArt({ className }: ArtProps) {
-  return box(
-    <g fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M28 34h44l12 16-34 34-34-34z" fill="currentColor" fillOpacity="0.24" />
-      <path d="M16 50h68M28 34l6 16-6 0M72 34l-6 16 6 0M50 84L34 50l8-16M50 84l16-34-8-16" strokeWidth="3" />
-    </g>,
-    className,
-  )
-}
-
 /** 크라켄 — 대칭 촉수 */
 export function KrakenArt({ className }: ArtProps) {
   return box(

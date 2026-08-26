@@ -20,8 +20,6 @@ export function pickWeakestLegal(
     switch (card.kind) {
       case 'escape':
         return 0
-      case 'loot':
-        return 1
       case 'tigress':
         return 2 // 도주로 선언해서 낼 것이므로 도주급
       case 'kraken':
