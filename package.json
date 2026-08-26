@@ -1,0 +1,21 @@
+{
+  "name": "boardgame",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/core", "server", "web"],
+  "scripts": {
+    "dev": "npm run build:core && concurrently -n core,server,web -c cyan,magenta,green \"npm:watch:core\" \"npm:dev:server\" \"npm:dev:web\"",
+    "build:core": "tsc -b packages/core",
+    "watch:core": "tsc -b packages/core --watch --preserveWatchOutput",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:web": "npm run dev --workspace=web",
+    "build": "npm run build:core && npm run build --workspace=server && npm run build --workspace=web",
+    "test": "vitest run --root packages/core",
+    "typecheck": "npm run build:core && tsc --noEmit -p server && tsc --noEmit -p web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  }
+}

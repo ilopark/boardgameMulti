@@ -1,0 +1,165 @@
+import { useMemo, useState } from 'react'
+import { GAME_LABEL, MIN_PLAYERS, skullking, type PlayerPublic, type RoomPublic } from '@bg/core'
+import { request } from './socket.js'
+
+interface Props {
+  room: RoomPublic
+  myId: string
+  onLeave: () => Promise<void>
+  onError: (message: string) => void
+}
+
+export default function RoomView({ room, myId, onLeave, onError }: Props) {
+  const [busy, setBusy] = useState(false)
+  const me = room.players.find((p) => p.id === myId)
+  const isHost = room.hostId === myId
+  const seated = room.players.filter((p) => p.seat !== null)
+
+  const bySeat = useMemo(() => {
+    const map = new Map<number, PlayerPublic>()
+    for (const p of room.players) if (p.seat !== null) map.set(p.seat, p)
+    return map
+  }, [room.players])
+
+  const run = async (fn: () => Promise<unknown>) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fn()
+    } catch (e) {
+      onError(e instanceof Error ? e.message : '오류가 발생했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(room.code)
+      onError('방 코드를 복사했습니다.')
+    } catch {
+      onError('복사에 실패했습니다. 직접 입력해주세요.')
+    }
+  }
+
+  const minPlayers = MIN_PLAYERS[room.game]
+  const allReady = seated.length >= minPlayers && seated.every((p) => p.ready)
+
+  // 딜러 왼쪽 사람이 그 라운드 선턴
+  const leaderSeat =
+    room.dealerSeat === null ? null : skullking.roundFirstLeader(room.dealerSeat, seated.length)
+  const dealerName = room.dealerSeat === null ? null : (bySeat.get(room.dealerSeat)?.nickname ?? null)
+  const leaderName = leaderSeat === null ? null : (bySeat.get(leaderSeat)?.nickname ?? null)
+
+  return (
+    <div className="room">
+      <section className="card">
+        <div className="roomhead">
+          <div>
+            <h2>{GAME_LABEL[room.game]}</h2>
+            <p className="muted">
+              {room.phase === 'lobby' ? '대기 중' : room.phase === 'playing' ? '게임 중' : '종료'} ·{' '}
+              {seated.length}/{room.seatCount}명
+            </p>
+          </div>
+          <button type="button" className="codebadge" onClick={() => void copyCode()}>
+            {room.code}
+            <small>탭해서 복사</small>
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>자리</h2>
+        <ul className="seats">
+          {Array.from({ length: room.seatCount }, (_, seat) => {
+            const p = bySeat.get(seat)
+            const mine = p?.id === myId
+            return (
+              <li key={seat} className={p ? (mine ? 'seat seat--mine' : 'seat') : 'seat seat--empty'}>
+                <button
+                  type="button"
+                  disabled={busy || room.phase !== 'lobby' || (Boolean(p) && !mine)}
+                  onClick={() => void run(() => request('room:sit', { seat }))}
+                >
+                  <span className="seatno">{seat + 1}</span>
+                  <span className="seatname">{p ? p.nickname : '빈자리'}</span>
+                  <span className="seatflags">
+                    {p?.id === room.hostId && <em className="tag">방장</em>}
+                    {p && room.dealerSeat === seat && <em className="tag">딜러</em>}
+                    {p && leaderSeat === seat && <em className="tag tag--lead">선턴</em>}
+                    {p && !p.connected && <em className="tag tag--warn">끊김</em>}
+                    {p?.ready && room.phase === 'lobby' && <em className="tag tag--ok">준비</em>}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        {room.game === 'tichu' && (
+          <p className="muted">티츄는 1·3번, 2·4번이 한 팀입니다.</p>
+        )}
+        {room.game === 'skullking' && room.phase === 'lobby' && (
+          <p className="muted">
+            첫 딜러는 시작할 때 <strong>무작위</strong>로 정해집니다. 선턴은 딜러 왼쪽 사람이고,
+            라운드마다 딜러가 한 칸씩 옮겨갑니다.
+          </p>
+        )}
+        {isHost && room.phase === 'lobby' && seated.length > 1 && (
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            onClick={() => void run(() => request('room:shuffle', {}))}
+          >
+            자리 섞기
+          </button>
+        )}
+      </section>
+
+      {room.phase === 'lobby' && (
+        <section className="card actions">
+          <button
+            type="button"
+            className={me?.ready ? 'secondary' : 'primary'}
+            disabled={busy || me?.seat === null}
+            onClick={() => void run(() => request('room:ready', { ready: !me?.ready }))}
+          >
+            {me?.ready ? '준비 취소' : '준비'}
+          </button>
+          {isHost && (
+            <button
+              type="button"
+              className="primary"
+              disabled={busy || !allReady}
+              onClick={() => void run(() => request('room:start', {}))}
+            >
+              시작
+            </button>
+          )}
+          <button type="button" className="ghost" disabled={busy} onClick={() => void run(onLeave)}>
+            나가기
+          </button>
+        </section>
+      )}
+
+      {room.phase === 'playing' && (
+        <section className="card">
+          <h2>게임 화면</h2>
+          {dealerName && leaderName && (
+            <p className="muted">
+              첫 딜러는 <strong>{dealerName}</strong>(무작위), 선턴은 <strong>{leaderName}</strong>입니다.
+            </p>
+          )}
+          <p className="muted">
+            카드 UI는 아직 구현 전입니다. 룰 엔진(트릭 판정·점수·조합 파싱·턴 순서)은 완성됐고,
+            여기에 게임 상태머신을 붙이면 됩니다. docs/ROADMAP.md 2단계.
+          </p>
+          <button type="button" className="ghost" disabled={busy} onClick={() => void run(onLeave)}>
+            나가기
+          </button>
+        </section>
+      )}
+    </div>
+  )
+}
