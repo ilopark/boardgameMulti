@@ -283,8 +283,12 @@ export default function TichuGameView({ room, view, remainingMs, seq, autoPass, 
                     <button
                       type="button"
                       className={autoPass ? 'autopass autopass--on' : 'autopass'}
-                      disabled={busy}
-                      title="이번 트릭 동안 내 차례가 오면 자동으로 패스합니다. 트릭이 끝나면 풀립니다. 리드하거나 소원을 이행해야 하면 자동으로 풀립니다."
+                      disabled={busy || view.hand.length === 0}
+                      title={
+                        view.hand.length === 0
+                          ? '이미 골인해서 트릭 패스를 쓸 수 없습니다'
+                          : '이번 트릭 동안 내 차례가 오면 자동으로 패스합니다. 트릭이 끝나면 풀립니다. 리드하거나 소원을 이행해야 하면 자동으로 풀립니다.'
+                      }
                       onClick={() => void run(() => request('tichu:autopass', { on: !autoPass }))}
                     >
                       {autoPass ? '트릭 패스 끄기' : '트릭 패스'}
