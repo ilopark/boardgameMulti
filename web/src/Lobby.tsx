@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { GAME_LABEL, MIN_PLAYERS, SEAT_COUNT, type GameId } from '@bg/core'
+import { loadNickname, saveNickname } from './socket.js'
 
 interface Props {
   onCreate: (nickname: string, game: GameId) => Promise<void>
@@ -10,7 +11,8 @@ interface Props {
 const GAMES: GameId[] = ['tichu', 'skullking']
 
 export default function Lobby({ onCreate, onJoin, onError }: Props) {
-  const [nickname, setNickname] = useState('')
+  // 지난번에 쓴 닉네임을 기억해 미리 채운다
+  const [nickname, setNickname] = useState(loadNickname)
   const [code, setCode] = useState('')
   const [game, setGame] = useState<GameId>('skullking')
   const [busy, setBusy] = useState(false)
@@ -33,7 +35,10 @@ export default function Lobby({ onCreate, onJoin, onError }: Props) {
         <span>닉네임</span>
         <input
           value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
+          onChange={(e) => {
+            setNickname(e.target.value)
+            saveNickname(e.target.value) // 입력하는 대로 기억해둔다
+          }}
           maxLength={12}
           placeholder="1~12자"
           autoComplete="off"

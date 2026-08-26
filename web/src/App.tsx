@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { GAME_LABEL, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
+import { GAME_LABEL, type ChatMessage, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
 import { clearIdentity, loadIdentity, request, saveIdentity, socket } from './socket.js'
 import { applyTheme, loadTheme, type Theme } from './theme.js'
+import Chat from './Chat.js'
 import Lobby from './Lobby.js'
 import RoomView from './RoomView.js'
 import GameView from './game/GameView.js'
@@ -33,11 +34,17 @@ export default function App() {
   const [connected, setConnected] = useState(socket.connected)
   const [toast, setToast] = useState<string | null>(null)
   const [announce, setAnnounce] = useState<{ kind: 'tichu' | 'grand'; nickname: string } | null>(null)
+  const [chat, setChat] = useState<ChatMessage[]>([])
   const [theme, setTheme] = useState<Theme>(loadTheme)
 
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  // 방이 바뀌거나 나가면 채팅을 비운다 (저장하지 않는다)
+  useEffect(() => {
+    setChat([])
+  }, [room?.code])
 
   const notify = useCallback((message: string) => {
     setToast(message)
@@ -69,11 +76,14 @@ export default function App() {
       clearIdentity()
     }
 
+    const onChat = (m: ChatMessage) => setChat((prev) => [...prev, m].slice(-200))
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('room:state', onState)
     socket.on('game:view', onGameView)
     socket.on('game:announce', onAnnounce)
+    socket.on('chat:message', onChat)
     socket.on('room:closed', onClosed)
     // 리스너를 붙이기 전에 이미 connect가 끝났을 수 있다. 현재 상태를 한 번 맞춰준다.
     setConnected(socket.connected)
@@ -83,6 +93,7 @@ export default function App() {
       socket.off('room:state', onState)
       socket.off('game:view', onGameView)
       socket.off('game:announce', onAnnounce)
+      socket.off('chat:message', onChat)
       clearTimeout(announceTimer)
       socket.off('room:closed', onClosed)
     }
@@ -136,8 +147,12 @@ export default function App() {
     setMyId(null)
   }, [])
 
+  // 스컬킹 게임 중에는 화면을 꽉 채우는 몰입형 레이아웃으로 전환한다
+  const immersive =
+    !IS_GALLERY && Boolean(room && myId && game) && room?.phase !== 'lobby' && room?.game === 'skullking'
+
   return (
-    <div className="app">
+    <div className={immersive ? 'app app--immersive' : 'app'}>
       <header className="topbar">
         <span className="brand">보드게임</span>
         <span className="topbar__right">
@@ -189,6 +204,14 @@ export default function App() {
       <footer className="footer">
         {room ? `${GAME_LABEL[room.game]} · 방코드 ${room.code}` : '친구랑 하는 티츄 / 스컬킹'}
       </footer>
+
+      {room && myId && !IS_GALLERY && (
+        <Chat
+          messages={chat}
+          myId={myId}
+          onSend={(text) => request('chat:send', { text }).then(() => undefined)}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
 

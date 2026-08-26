@@ -55,3 +55,22 @@ export function loadIdentity(): { code: string; identity: Identity } | null {
 export function clearIdentity(): void {
   localStorage.removeItem(KEY)
 }
+
+// ── 닉네임 기억 (매번 다시 입력하지 않게) ──
+const NICK_KEY = 'bg.nickname'
+
+export function saveNickname(name: string): void {
+  try {
+    localStorage.setItem(NICK_KEY, name)
+  } catch {
+    // 저장 실패는 무시 (프라이빗 모드 등)
+  }
+}
+
+export function loadNickname(): string {
+  try {
+    return localStorage.getItem(NICK_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
