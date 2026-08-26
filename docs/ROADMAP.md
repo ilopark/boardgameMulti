@@ -10,23 +10,21 @@
 - [x] Socket.IO 서버 + 방코드 입장 + 자리 + 준비 + 재접속
 - [x] 턴 순서: 무작위 첫 딜러 · 딜러 회전 · 라운드별 선턴 · 자리 섞기
 
-## 2단계 — 게임이 실제로 돌아가게 (다음)
+## 2단계 — 게임이 실제로 돌아가게 (스컬킹 완료)
 
 핵심은 **게임 상태머신**. 트릭 판정 함수는 이미 있으니, "지금 누구 차례이고 무엇을 할 수 있는가"를 관리하는 층을 올린다.
 
 ### 스컬킹 (이쪽을 먼저 — 룰이 단순하고 인원 유연)
 
-- [ ] `packages/core/src/skullking/game.ts` — 라운드 상태머신
-      (턴 순서는 `turnorder.ts`에 이미 있으니 그대로 쓰면 된다)
-      `dealing → bidding → playing → scoring → 다음 라운드`
-- [ ] 리듀서 형태로: `reduce(state, action) => { state, events }`
-      액션은 `bid` / `playCard` / `useAbility`
-- [ ] 좌석별 마스킹된 뷰 만들기 (`viewFor(state, seat)`) — 남의 손패는 장수만
-- [ ] 서버에 붙이기: `game:action` 수신 → 검증 → 전원에게 각자 뷰 전송
-- [ ] 웹: 손패 · 입찰 UI · 트릭 영역 · 점수판
-- [ ] 티그리스 선언 UI, 해적 능력 UI (로지/바히즈/라스칼/후아니타/해리)
-- [ ] **2인 유령 손패**: 세 번째 손패를 서버가 들고, 유령 차례에 맨 위 카드를 자동으로 뒤집어 낸다
-      (`twoPlayerTrickOrder` · `optionsForPlayerCount` 준비 완료)
+- [x] `packages/core/src/skullking/game.ts` — 라운드 상태머신
+      `bidding → playing → trickEnd → roundEnd → 다음 라운드 → gameEnd`
+- [x] 순수 리듀서 `reduce(state, action, rng)` — 액션은 `bid` / `play` / `advance`
+- [x] 좌석별 마스킹 뷰 `viewFor(state, seat)` — 남의 손패는 장수만, 입찰은 전원 확정 후 공개
+- [x] 서버 연결: `game:bid` / `game:play` / `game:ready` / `game:abort`, 각자에게 다른 뷰 전송
+- [x] 웹: 손패 · 입찰 · 트릭 영역 · 점수판 · 라운드 결과 · 최종 순위
+- [x] 티그리스 선언 모달
+- [x] 2인 유령 손패 자동 플레이
+- [ ] 해적 고유 능력 (로지/바히즈/라스칼/후아니타/해리) — 옵션은 있으나 미구현, 기본 off
 
 ### 티츄
 

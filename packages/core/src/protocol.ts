@@ -55,11 +55,26 @@ export interface ClientToServer {
   'room:start': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   /** 방장이 자리를 무작위로 섞는다. 입장 순서가 그대로 굳는 걸 막기 위한 것. */
   'room:shuffle': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+
+  // ── 게임 진행 ──
+  'game:bid': (p: { value: number }, cb: (r: Ack<null>) => void) => void
+  'game:play': (p: { cardId: string; tigressAs?: 'pirate' | 'escape' }, cb: (r: Ack<null>) => void) => void
+  /** 트릭/라운드 결과를 다 봤으니 넘어가자 (전원이 누르면 타이머를 기다리지 않는다) */
+  'game:ready': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+  /** 방장이 게임을 끝내고 대기실로 돌아간다 */
+  'game:abort': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
 }
 
 /** 서버 → 클라이언트 */
 export interface ServerToClient {
   'room:state': (room: RoomPublic) => void
+  /**
+   * 게임 상태. **받는 사람에 맞춰 가려진 뷰**라 사람마다 내용이 다르다.
+   * 타입은 순환 참조를 피하려고 unknown으로 두고, 클라이언트가 SkPlayerView로 캐스팅한다.
+   */
+  'game:view': (view: unknown) => void
+  /** 결과 화면에서 몇 명이 "다음"을 눌렀는지 */
+  'game:ready': (p: { ready: number; total: number }) => void
   'room:closed': (p: { reason: string }) => void
   /** 서버가 판단한 에러를 토스트로 띄우기 위한 채널 */
   'error:toast': (p: { message: string }) => void

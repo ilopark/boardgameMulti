@@ -166,3 +166,132 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   font-size: 14px;
   max-width: calc(100% - 36px);
 }
+
+/* ─────────── 게임 화면 ─────────── */
+
+.game { display: flex; flex-direction: column; gap: 14px; }
+
+.gamebar { flex-direction: row; align-items: center; justify-content: space-between; }
+.gamebar__right { display: flex; gap: 8px; }
+.pill {
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; font-size: 13px;
+}
+
+/* 플레이어 목록 */
+.players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.player {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 9px 12px; font-size: 14px;
+}
+.player--me { border-color: var(--accent); }
+.player--turn { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+.player--ghost { opacity: 0.75; border-style: dashed; }
+.player__name { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.player__stats { display: flex; gap: 12px; }
+.stat { display: flex; flex-direction: column; align-items: center; font-size: 14px; line-height: 1.2; }
+.stat em { font-style: normal; font-size: 10px; color: var(--muted); }
+.stat--total { color: var(--accent); font-weight: 600; }
+
+/* 입찰 */
+.bidrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.bid {
+  min-width: 46px; background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--text); font-size: 17px; font-weight: 600;
+}
+.bid--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 카드 */
+.card:not(.card--special):not([class*='card--']) { /* 기존 .card 레이아웃과 충돌 방지용 */ }
+
+.hand__head { display: flex; align-items: center; justify-content: space-between; }
+.hand__cards { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.turnflag { font-size: 12px; color: var(--muted); }
+.turnflag--on { color: var(--ok); font-weight: 600; }
+
+/* 카드 자체 — .card 클래스가 패널에도 쓰여서 구체적으로 지정한다 */
+.hand__cards .card,
+.trick .card,
+.card--small {
+  width: 68px; min-height: 90px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 8px 4px;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 13px; text-align: center;
+}
+.card--small { width: 58px; min-height: 76px; font-size: 12px; }
+
+.card__icon { font-size: 20px; line-height: 1; }
+.card--small .card__icon { font-size: 17px; }
+.card__name { font-weight: 700; font-size: 15px; }
+.card--small .card__name { font-size: 13px; }
+.card__sub, .card__tag { font-size: 9px; color: var(--muted); }
+.card__tag { color: var(--accent); font-weight: 600; }
+
+.card--green  { background: #17351f; border-color: #2f6b3d; }
+.card--yellow { background: #3a3113; border-color: #7a6420; }
+.card--purple { background: #2b1c3d; border-color: #5b3a86; }
+.card--black  { background: #1b1b1f; border-color: #55555f; }
+.card--special { background: #232a3a; border-color: #3d4a63; }
+
+.card--clickable { cursor: pointer; }
+.card--clickable:hover:not(:disabled) { transform: translateY(-3px); }
+.hand__cards .card--disabled { opacity: 0.32; cursor: not-allowed; }
+.card--selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* 테이블(트릭) */
+.trick { display: flex; flex-wrap: wrap; gap: 10px; }
+.trick__slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.trick__name { font-size: 11px; color: var(--muted); }
+.trick__slot--won .card--small { outline: 2px solid var(--ok); outline-offset: 1px; }
+.trick__slot--won .trick__name { color: var(--ok); font-weight: 600; }
+
+.outcome { border-top: 1px solid var(--line); padding-top: 10px; font-size: 14px; }
+.bonuslist { margin: 6px 0 0; padding-left: 18px; color: var(--ok); font-size: 13px; }
+
+/* 라운드 결과 표 */
+.scoretable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.scoretable th {
+  text-align: right; color: var(--muted); font-weight: 500;
+  padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 11px;
+}
+.scoretable th:first-child, .scoretable td:first-child { text-align: left; }
+.scoretable td { text-align: right; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.row--ok td:first-child { color: var(--ok); }
+.row--miss td:first-child { color: var(--warn); }
+
+/* 최종 순위 */
+.ranking { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rank {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px;
+}
+.rank--win { border-color: var(--ok); }
+.rank__no {
+  width: 26px; height: 26px; flex: none; display: grid; place-items: center;
+  background: var(--bg); border-radius: 8px; font-size: 12px; color: var(--muted);
+}
+.rank__name { flex: 1; font-weight: 600; }
+.rank__score { color: var(--accent); font-weight: 700; }
+
+/* 티그리스 선언 모달 */
+.modal {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: grid; place-items: center; padding: 20px; z-index: 10;
+}
+.modal__box {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 20px; max-width: 340px; width: 100%;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.modal__box h2 { margin: 0; font-size: 16px; }
+.modal__actions { display: flex; flex-direction: column; gap: 8px; }
+
+@media (max-width: 420px) {
+  .hand__cards .card { width: 60px; min-height: 80px; }
+  .player__stats { gap: 8px; }
+}

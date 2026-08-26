@@ -6,6 +6,7 @@ import { Server, type Socket } from 'socket.io'
 import { randomInt } from 'node:crypto'
 import {
   createRng,
+  hashSeed,
   GAME_LABEL,
   josa,
   MIN_PLAYERS,
@@ -89,6 +90,69 @@ function broadcast(room: Room): void {
   io.to(room.code).emit('room:state', toPublic(room))
 }
 
+/** 각자에게 **자기 것만 보이는** 게임 뷰를 보낸다. 사람마다 내용이 다르다. */
+function broadcastGame(room: Room): void {
+  const game = room.skGame
+  if (!game) return
+  for (const player of room.players.values()) {
+    if (player.socketId === null || player.seat === null) continue
+    const socket = io.sockets.sockets.get(player.socketId)
+    socket?.emit('game:view', skullking.viewFor(game, player.seat))
+  }
+}
+
+function clearAdvanceTimer(room: Room): void {
+  if (room.advanceTimer) {
+    clearTimeout(room.advanceTimer)
+    room.advanceTimer = null
+  }
+}
+
+/** 결과 화면(trickEnd/roundEnd)에서 다음으로 넘어간다 */
+function advance(room: Room): void {
+  const game = room.skGame
+  if (!game || !room.rng) return
+  if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
+
+  clearAdvanceTimer(room)
+  room.readyToAdvance.clear()
+  room.skGame = skullking.reduce(game, { type: 'advance' }, room.rng)
+
+  const next = room.skGame
+  room.dealerSeat = skullking.dealerForRound(next.initialDealer, next.roundIndex, next.humanCount)
+
+  if (next.phase === 'gameEnd') {
+    room.phase = 'finished'
+    broadcast(room)
+  }
+  broadcastGame(room)
+  scheduleAdvance(room)
+}
+
+/** 결과 화면은 자동으로 넘어간다. 전원이 "다음"을 누르면 기다리지 않는다. */
+const TRICK_END_MS = 2600
+const ROUND_END_MS = 12000
+
+function scheduleAdvance(room: Room): void {
+  clearAdvanceTimer(room)
+  const game = room.skGame
+  if (!game) return
+  if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
+  const wait = game.phase === 'trickEnd' ? TRICK_END_MS : ROUND_END_MS
+  room.advanceTimer = setTimeout(() => advance(room), wait)
+}
+
+/** 게임을 끝내고 대기실로 되돌린다 */
+function resetToLobby(room: Room): void {
+  clearAdvanceTimer(room)
+  room.skGame = null
+  room.rng = null
+  room.dealerSeat = null
+  room.readyToAdvance.clear()
+  room.phase = 'lobby'
+  for (const p of room.players.values()) p.ready = false
+}
+
 function isValidNickname(nickname: unknown): nickname is string {
   return typeof nickname === 'string' && nickname.trim().length >= 1 && nickname.trim().length <= 12
 }
@@ -149,6 +213,7 @@ io.on('connection', (socket) => {
         void socket.join(room.code)
         cb({ ok: true, data: { room: toPublic(room), identity } })
         broadcast(room)
+        broadcastGame(room) // 새로고침해도 판이 그대로 보이도록
         return
       }
     }
@@ -237,15 +302,84 @@ io.on('connection', (socket) => {
     const seed = randomInt(0, 2 ** 31)
     room.dealerSeat = skullking.pickInitialDealer(seated.length, createRng(seed))
 
-    // TODO: 여기서 게임 상태머신 시작 (docs/ROADMAP.md 2단계)
+    // 카드 셔플용 난수. 방 코드 + 무작위 시드를 섞어서 방마다 다르게.
+    room.rng = createRng(hashSeed(`${room.code}:${seed}`))
+
+    if (room.game === 'skullking') {
+      const opts = skullking.makeSkOptions(room.options as Partial<skullking.SkRuleOptions>)
+      room.skGame = skullking.createGame(seated.length, opts, room.dealerSeat, room.rng)
+    }
+
     room.phase = 'playing'
     cb({ ok: true })
     broadcast(room)
+    broadcastGame(room)
     const leader = skullking.roundFirstLeader(room.dealerSeat, seated.length)
     console.log(
       `[게임 시작] ${room.code} ${GAME_LABEL[room.game]} ${seated.length}명 ` +
         `· 첫 딜러 ${room.dealerSeat + 1}번 · 선턴 ${leader + 1}번`,
     )
+  })
+
+  /** 게임 액션 공통 처리 — 좌석 확인, 규칙 위반은 한국어 메시지로 돌려준다 */
+  function withGame(
+    cb: (r: { ok: boolean; error?: string }) => void,
+    fn: (room: Room, seat: number, game: skullking.SkGameState) => void,
+  ): void {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (!room.skGame) return cb({ ok: false, error: '진행 중인 게임이 없습니다.' })
+    if (player.seat === null) return cb({ ok: false, error: '자리에 앉아 있지 않습니다.' })
+    try {
+      fn(room, player.seat, room.skGame)
+      cb({ ok: true })
+    } catch (e) {
+      // 규칙 위반은 정상적인 흐름이다. 서버를 죽이지 않고 메시지만 돌려준다.
+      if (e instanceof skullking.SkRuleError) return cb({ ok: false, error: e.message })
+      console.error('[게임 액션 오류]', e)
+      cb({ ok: false, error: '알 수 없는 오류가 발생했습니다.' })
+    }
+  }
+
+  socket.on('game:bid', ({ value }, cb) => {
+    withGame(cb, (room, seat, game) => {
+      room.skGame = skullking.reduce(game, { type: 'bid', seat, value }, room.rng!)
+      broadcastGame(room)
+    })
+  })
+
+  socket.on('game:play', ({ cardId, tigressAs }, cb) => {
+    withGame(cb, (room, seat, game) => {
+      room.skGame = skullking.reduce(
+        game,
+        tigressAs ? { type: 'play', seat, cardId, tigressAs } : { type: 'play', seat, cardId },
+        room.rng!,
+      )
+      broadcastGame(room)
+      scheduleAdvance(room)
+    })
+  })
+
+  socket.on('game:ready', (_p, cb) => {
+    withGame(cb, (room, seat, game) => {
+      if (game.phase !== 'trickEnd' && game.phase !== 'roundEnd') return
+      room.readyToAdvance.add(seat)
+      const seated = [...room.players.values()].filter((p) => p.seat !== null).length
+      io.to(room.code).emit('game:ready', { ready: room.readyToAdvance.size, total: seated })
+      // 전원이 눌렀으면 타이머를 기다리지 않는다
+      if (room.readyToAdvance.size >= seated) advance(room)
+    })
+  })
+
+  socket.on('game:abort', (_p, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 게임을 끝낼 수 있습니다.' })
+    resetToLobby(room)
+    cb({ ok: true })
+    broadcast(room)
   })
 
   socket.on('room:shuffle', (_p, cb) => {
@@ -263,6 +397,12 @@ io.on('connection', (socket) => {
     const ctx = currentRoomAndPlayer(socket)
     if (!ctx) return cb({ ok: true })
     const { room, player } = ctx
+    if (room.phase === 'playing') {
+      return cb({
+        ok: false,
+        error: '게임 중에는 나갈 수 없습니다. 탭을 닫아도 자리는 유지됩니다. (방장은 "게임 끝내기" 가능)',
+      })
+    }
     room.players.delete(player.id)
     reassignHostIfNeeded(room)
     void socket.leave(room.code)

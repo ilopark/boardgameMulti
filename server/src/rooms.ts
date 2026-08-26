@@ -1,5 +1,14 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto'
-import { SEAT_COUNT, type GameId, type PlayerPublic, type RoomPublic } from '@bg/core'
+import {
+  SEAT_COUNT,
+  type GameId,
+  type PlayerPublic,
+  type RoomPublic,
+  type Rng,
+  type skullking,
+} from '@bg/core'
+
+type SkGameState = skullking.SkGameState
 
 export interface Player {
   id: string
@@ -21,6 +30,14 @@ export interface Room {
   options: Record<string, unknown>
   /** 이번 라운드 딜러 좌석. 게임 시작 시 무작위로 정해진다. 대기 중엔 null. */
   dealerSeat: number | null
+  /** 진행 중인 스컬킹 게임 상태. 서버만 들고 있고, 클라이언트엔 가려진 뷰만 나간다. */
+  skGame: SkGameState | null
+  /** 결과 화면에서 "다음"을 누른 좌석들 */
+  readyToAdvance: Set<number>
+  /** trickEnd/roundEnd 자동 진행 타이머 */
+  advanceTimer: NodeJS.Timeout | null
+  /** 카드를 돌릴 때 쓰는 난수. 방마다 하나를 계속 쓴다. */
+  rng: Rng | null
   createdAt: number
 }
 
@@ -51,6 +68,10 @@ export function createRoom(game: GameId, defaultOptions: Record<string, unknown>
     players: new Map(),
     options: defaultOptions,
     dealerSeat: null,
+    skGame: null,
+    readyToAdvance: new Set(),
+    advanceTimer: null,
+    rng: null,
     createdAt: Date.now(),
   }
   rooms.set(room.code, room)

@@ -13,7 +13,10 @@ export interface SkRuleOptions {
   useLoot: boolean
   useKraken: boolean
   useWhiteWhale: boolean
-  /** 해적 고유 능력(로지/바히즈/라스칼/후아니타/해리) */
+  /**
+   * 해적 고유 능력(로지/바히즈/라스칼/후아니타/해리).
+   * **아직 미구현.** 켜도 능력이 발동하지 않으므로 기본값은 false로 둔다.
+   */
   usePirateAbilities: boolean
   /**
    * 2인 플레이에서 Graybeard's Ghost(유령 손패)를 쓸지.
@@ -59,7 +62,7 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
     useLoot: true,
     useKraken: true,
     useWhiteWhale: false,
-    usePirateAbilities: true,
+    usePirateAbilities: false, // 미구현
     useGhostForTwoPlayers: true,
     skPirateBonusOrderMatters: true,
     bonuses: {
@@ -81,7 +84,7 @@ export const SK_PRESETS: Record<SkEdition, SkRuleOptions> = {
     useLoot: true,
     useKraken: true,
     useWhiteWhale: true,
-    usePirateAbilities: true,
+    usePirateAbilities: false, // 미구현
     useGhostForTwoPlayers: true,
     skPirateBonusOrderMatters: false,
     bonuses: {
