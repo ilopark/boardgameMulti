@@ -1217,6 +1217,35 @@ button { letter-spacing: 0.02em; }
 .chat__input input { flex: 1; min-width: 0; }
 .chat__input button { flex: none; }
 
+/* ── PC에서 게임 중에는 채팅을 왼쪽으로 (손패를 가리지 않게) ──
+   모바일(≤760px)·로비·대기실은 기존대로 오른쪽 아래 유지.
+   게임 화면(스컬킹 immersive / 티츄 playing)에서만 좌측 빈 공간으로 옮긴다. */
+/* 스컬킹: 좌측 대시보드(레일, 폭 300px)가 화면 높이를 꽉 채우므로 데스크톱 폭 어디서나 좌측이 안전하다.
+   레일 폭에 맞춰 붙이고, 방장 '게임 끝내고 대기실로' 버튼 자리를 아래에 비워 어떤 요소와도 겹치지 않게 한다. */
+@media (min-width: 761px) {
+  .app--immersive .chatfab { left: 12px; right: auto; }
+  .app--immersive .chat {
+    left: 12px; right: auto;
+    width: 276px;                       /* 레일 300px − 좌우 패딩(12px×2) */
+    height: 360px;
+    bottom: 76px;                       /* 대시보드 맨 아래 '대기실로' 버튼 높이만큼 띄움 */
+    max-height: calc(100dvh - 76px - 16px);
+  }
+}
+
+/* 티츄: 사이드바가 없고 콘텐츠(max-width 1500px)가 가운데 정렬 → 손패가 아래를 가로지른다.
+   따라서 콘텐츠 바깥 '왼쪽 여백'에만 붙이고, 그 여백이 채팅을 담을 만큼 넓을 때(≈1800px↑)만 좌측으로 옮긴다.
+   그보다 좁으면 손패를 가리게 되므로 기존 오른쪽 아래 위치를 유지한다.
+   폭은 남는 여백 크기에 반응형 — 콘텐츠를 절대 넘지 않는다. */
+@media (min-width: 1800px) {
+  .app--playing .chatfab { left: 12px; right: auto; }
+  .app--playing .chat {
+    left: 12px; right: auto;
+    bottom: 16px;
+    width: min(320px, calc((100vw - 1500px) / 2 - 4px));
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    로비 홈 · 인증 (멀티플레이)
    ═══════════════════════════════════════════════════════════ */
