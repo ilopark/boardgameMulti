@@ -74,3 +74,31 @@ export function loadNickname(): string {
     return ''
   }
 }
+
+// ── 로그인 세션 토큰 ──
+// 서버는 이 토큰의 해시만 갖고 있다. 원문은 이 브라우저에만 있다.
+const AUTH_KEY = 'bg.auth'
+
+export function saveAuthToken(token: string): void {
+  try {
+    localStorage.setItem(AUTH_KEY, token)
+  } catch {
+    // 프라이빗 모드 등 — 저장 못 해도 이번 세션은 유지된다
+  }
+}
+
+export function loadAuthToken(): string {
+  try {
+    return localStorage.getItem(AUTH_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(AUTH_KEY)
+  } catch {
+    // 무시
+  }
+}

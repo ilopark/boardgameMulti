@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { GAME_LABEL, type ChatMessage, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
-import { clearIdentity, loadIdentity, request, saveIdentity, socket } from './socket.js'
+import { clearIdentity, loadIdentity, loadNickname, request, saveIdentity, saveNickname, socket } from './socket.js'
 import { applyTheme, loadTheme, type Theme } from './theme.js'
+import { useAuth } from './auth/useAuth.js'
+import AuthPanel from './auth/AuthPanel.js'
 import Chat from './Chat.js'
-import Lobby from './Lobby.js'
+import LobbyHome from './LobbyHome.js'
+import type { RoomVisibility } from '@bg/core'
 import RoomView from './RoomView.js'
 import GameView from './game/GameView.js'
 import TichuGameView from './game/TichuGameView.js'
@@ -36,10 +39,19 @@ export default function App() {
   const [announce, setAnnounce] = useState<{ kind: 'tichu' | 'grand'; nickname: string } | null>(null)
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [theme, setTheme] = useState<Theme>(loadTheme)
+  const auth = useAuth()
+  // 게스트로 "시작하기" 를 눌렀는지. 로그인 사용자는 자동으로 통과한다.
+  const [enteredAsGuest, setEnteredAsGuest] = useState(false)
+  const [nickname, setNickname] = useState(loadNickname)
 
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  // 로그인하면 그 계정 닉네임을 방 만들 때 기본값으로 쓴다
+  useEffect(() => {
+    if (auth.user) setNickname(auth.user.nickname)
+  }, [auth.user])
 
   // 방이 바뀌거나 나가면 채팅을 비운다 (저장하지 않는다)
   useEffect(() => {
@@ -125,19 +137,25 @@ export default function App() {
     }
   }, [])
 
-  const handleCreate = useCallback(async (nickname: string, game: GameId) => {
-    const res = await request('room:create', { nickname, game })
-    setRoom(res.room)
-    setMyId(res.identity.playerId)
-    saveIdentity(res.room.code, res.identity)
-  }, [])
+  const handleCreate = useCallback(
+    async (game: GameId, visibility: RoomVisibility, title: string) => {
+      const res = await request('room:create', { nickname, game, visibility, title })
+      setRoom(res.room)
+      setMyId(res.identity.playerId)
+      saveIdentity(res.room.code, res.identity)
+    },
+    [nickname],
+  )
 
-  const handleJoin = useCallback(async (code: string, nickname: string) => {
-    const res = await request('room:join', { code: code.toUpperCase().trim(), nickname })
-    setRoom(res.room)
-    setMyId(res.identity.playerId)
-    saveIdentity(res.room.code, res.identity)
-  }, [])
+  const handleJoin = useCallback(
+    async (code: string) => {
+      const res = await request('room:join', { code: code.toUpperCase().trim(), nickname })
+      setRoom(res.room)
+      setMyId(res.identity.playerId)
+      saveIdentity(res.room.code, res.identity)
+    },
+    [nickname],
+  )
 
   const handleLeave = useCallback(async () => {
     await request('room:leave', {})
@@ -146,6 +164,19 @@ export default function App() {
     setGame(null)
     setMyId(null)
   }, [])
+
+  const handleNickname = useCallback((name: string) => {
+    setNickname(name)
+    saveNickname(name)
+  }, [])
+
+  const handleLogout = useCallback(() => {
+    void auth.logOut()
+    setEnteredAsGuest(false) // 로그인 화면으로 돌아간다
+  }, [auth])
+
+  // 로그인했거나 게스트로 시작을 눌렀으면 로비로 들어간다
+  const inLobby = auth.user !== null || enteredAsGuest || !auth.enabled
 
   // 스컬킹 게임 중에는 화면을 꽉 채우는 몰입형 레이아웃으로 전환한다
   const immersive =
@@ -196,8 +227,20 @@ export default function App() {
           )
         ) : room && myId ? (
           <RoomView room={room} myId={myId} onLeave={handleLeave} onError={notify} />
+        ) : auth.loading ? (
+          <div className="bootwait muted">불러오는 중…</div>
+        ) : inLobby ? (
+          <LobbyHome
+            user={auth.user}
+            nickname={nickname}
+            onNicknameChange={handleNickname}
+            onCreate={handleCreate}
+            onJoin={handleJoin}
+            onLogout={handleLogout}
+            onError={notify}
+          />
         ) : (
-          <Lobby onCreate={handleCreate} onJoin={handleJoin} onError={notify} />
+          <AuthPanel auth={auth} onGuest={() => setEnteredAsGuest(true)} onError={notify} />
         )}
       </main>
 

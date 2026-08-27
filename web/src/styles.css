@@ -1201,3 +1201,119 @@ button { letter-spacing: 0.02em; }
 .chat__input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
 .chat__input input { flex: 1; min-width: 0; }
 .chat__input button { flex: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   로비 홈 · 인증 (멀티플레이)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 첫 화면: 로그인 / 회원가입 / 게스트 ── */
+.authpanel {
+  max-width: 380px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;
+}
+.authpanel__brand { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.authpanel__logo {
+  font-size: 40px; line-height: 1; color: var(--accent);
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+.authpanel__brand h1 {
+  font-family: var(--font-display); font-size: 26px; margin: 2px 0 0; letter-spacing: 0.02em;
+}
+.authpanel__guestonly { display: flex; flex-direction: column; gap: 14px; text-align: center; }
+
+.authtabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.authtab {
+  flex: 1; padding: 10px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); color: var(--muted); font-weight: 600; font-size: 14px;
+}
+.authtab--on { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+
+.authform { display: flex; flex-direction: column; gap: 14px; }
+.authhint { font-size: 12px; line-height: 1.5; }
+.authdivider {
+  display: flex; align-items: center; gap: 12px; margin: 16px 0 12px; color: var(--muted); font-size: 12px;
+}
+.authdivider::before, .authdivider::after {
+  content: ''; flex: 1; height: 1px; background: var(--line);
+}
+.authpanel__guest { width: 100%; }
+
+/* ── 로비 홈 ── */
+.lobbyhome { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.lobbyhome__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.lobbyhome__me { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lobbyhome__nick { font-weight: 700; font-size: 16px; color: var(--text); }
+.lobbyhome__tag { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.linkbtn {
+  background: none; border: none; color: var(--muted); font-size: 13px;
+  text-decoration: underline; padding: 2px 4px;
+}
+.linkbtn:hover { color: var(--text); }
+.field--inline { flex-direction: row; align-items: center; gap: 8px; }
+.field--inline span { white-space: nowrap; }
+.field--inline input { width: 140px; }
+
+/* ── 방 만들기 패널 ── */
+.createpanel { display: flex; flex-direction: column; gap: 14px; }
+.createpanel__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.createpanel__label { font-size: 13px; color: var(--muted); min-width: 40px; }
+.createpanel__actions { display: flex; gap: 8px; justify-content: flex-end; }
+.createpanel__actions .ghost, .createpanel__actions .primary { flex: 0 0 auto; width: auto; padding: 10px 20px; }
+
+/* ── 세그먼트 버튼 (게임/공개 선택) ── */
+.segbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.segbtn {
+  padding: 8px 14px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); color: var(--muted); font-weight: 600; font-size: 14px;
+}
+.segbtn small { color: inherit; opacity: 0.7; font-weight: 400; font-size: 11px; }
+.segbtn--on { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+
+.checkfield { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.checkfield input { width: 15px; height: 15px; accent-color: var(--accent); }
+
+/* ── 코드로 참가 ── */
+.lobbyjoin__row { display: flex; gap: 8px; }
+.lobbyjoin__row .codeinput { flex: 1; }
+.lobbyjoin__row .primary { flex: 0 0 auto; width: auto; padding: 0 24px; }
+
+/* ── 공개방 목록 ── */
+.lobbylist { display: flex; flex-direction: column; gap: 12px; }
+.lobbylist__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lobbylist__head h2 { margin: 0; font-size: 16px; }
+.lobbylist__filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lobbylist__empty { text-align: center; padding: 32px 16px; }
+
+.roomcards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.roomcard {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.roomcard__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.roomcard__game {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 8px;
+  border-radius: 999px; background: var(--surface-2); color: var(--accent-2); white-space: nowrap;
+}
+.roomcard--tichu .roomcard__game { color: var(--warn); }
+.roomcard__title { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roomcard__badge {
+  font-size: 11px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px;
+}
+.roomcard__meta { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.roomcard__count { font-family: var(--font-mono); font-size: 14px; color: var(--text); }
+.roomcard__state { font-size: 12px; color: var(--ok); }
+.roomcard__state--playing { color: var(--muted); }
+.roomcard__join {
+  flex: 0 0 auto; padding: 8px 16px; background: var(--accent); color: var(--on-accent);
+  border: none; border-radius: var(--r); font-weight: 700; font-size: 14px;
+}
+.roomcard__join:disabled { background: var(--surface-2); color: var(--muted); }
+
+.bootwait { text-align: center; padding: 60px 16px; }
+
+@media (max-width: 560px) {
+  .roomcard { flex-wrap: wrap; }
+  .roomcard__main { flex-basis: 100%; }
+  .field--inline input { width: 110px; }
+}
