@@ -1235,15 +1235,18 @@ button { letter-spacing: 0.02em; }
 }
 
 /* 티츄: 사이드바가 없고 콘텐츠(max-width 1500px)가 가운데 정렬 → 손패가 아래를 가로지른다.
-   따라서 콘텐츠 바깥 '왼쪽 여백'에만 붙이고, 그 여백이 채팅을 담을 만큼 넓을 때(≈1800px↑)만 좌측으로 옮긴다.
-   그보다 좁으면 손패를 가리게 되므로 기존 오른쪽 아래 위치를 유지한다.
-   폭은 남는 여백 크기에 반응형 — 콘텐츠를 절대 넘지 않는다. */
-@media (min-width: 1800px) {
-  .app--playing .chatfab { left: 12px; right: auto; }
+   '가운데 정렬'이라 좌우 여백이 반반으로 나뉘어 왼쪽만으론 채팅이 너무 좁다.
+   → 가운데 정렬을 버리고 왼쪽에 채팅 전용 거터(≈316px)를 두고 게임판을 오른쪽으로 민다.
+      게임판 폭(max 1500px)은 그대로라 손패 14장이 스크롤 없이 다 보인다.
+   거터 + 손패가 다 보이는 최소 게임판(≈1344px)이 나란히 들어가려면 ≈1680px↑ 필요.
+   그보다 좁으면 손패가 잘리므로 채팅을 기존 오른쪽 아래로 되돌린다. */
+@media (min-width: 1680px) {
+  .app--playing { margin-left: 316px; margin-right: auto; }
+  .app--playing .chatfab { left: 12px; right: auto; bottom: 16px; }
   .app--playing .chat {
     left: 12px; right: auto;
     bottom: 16px;
-    width: min(320px, calc((100vw - 1500px) / 2 - 4px));
+    width: 292px;                       /* 거터 316 − 좌우 여백(12+12) */
   }
 }
 
