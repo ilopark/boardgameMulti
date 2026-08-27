@@ -303,3 +303,76 @@ function pickPlay(s: SkGameState, seat: number, rng: () => number): SkAction {
   }
   return { type: 'play', seat, cardId: card.id }
 }
+
+describe('3인 이상에서 좌석 2는 유령이 아니다 (자동 제출 버그)', () => {
+  // GHOST_SEAT=2 이므로, hasGhost 가드가 없으면 3인+ 게임에서 좌석 2(진짜 사람)의
+  // 카드가 저절로 나간다. 사용자가 겪은 "3번째 사람 패가 자동으로 나가는" 버그.
+
+  for (const players of [3, 4, 5, 6]) {
+    it(`${players}인: 좌석 2 차례가 오면 사람이 낼 때까지 멈춰 있어야 한다`, () => {
+      let s = newGame(players)
+      // 입찰 전원 완료
+      for (let seat = 0; seat < players; seat++) {
+        s = reduce(s, { type: 'bid', seat, value: 0 }, createRng(1))
+      }
+      expect(s.phase).toBe('playing')
+
+      // 좌석 2의 차례가 실제로 오는지, 그리고 그때 자동으로 넘어가지 않는지 확인.
+      // 좌석 2 앞 순번들을 사람이 직접 내면서 진행한다.
+      const rng = createRng(7)
+      let sawSeat2Turn = false
+      let guard = 0
+      while (s.phase === 'playing' && guard++ < 100) {
+        const seat = currentSeat(s)
+        if (seat === null) break
+        if (seat === GHOST_SEAT) {
+          // 좌석 2 차례에 멈춰 있다 = 자동 제출 안 됨 (정상)
+          sawSeat2Turn = true
+          const before = s.hands[GHOST_SEAT]!.length
+          // 한 바퀴 더 진행시켜도(다른 조치 없이) 좌석 2 손패가 저절로 줄지 않아야 한다.
+          // 여기서 직접 내주면 진행되지만, '내주기 전에는' 그대로여야 한다.
+          expect(s.hands[GHOST_SEAT]!.length).toBe(before)
+          const legal = legalFor(s, GHOST_SEAT)
+          s = reduce(s, { type: 'play', seat: GHOST_SEAT, cardId: legal[0]!.id }, rng)
+          break
+        }
+        const legal = legalFor(s, seat)
+        s = reduce(s, { type: 'play', seat, cardId: legal[0]!.id }, rng)
+      }
+      expect(sawSeat2Turn).toBe(true)
+    })
+  }
+
+  it('3인: 한 라운드를 끝까지 사람이 직접 둬도 좌석 2가 먼저 새지 않는다', () => {
+    let s = newGame(3)
+    for (let seat = 0; seat < 3; seat++) s = reduce(s, { type: 'bid', seat, value: 0 }, createRng(1))
+    const rng = createRng(3)
+    // 좌석 2의 손패는 오직 좌석 2의 play 액션으로만 줄어야 한다.
+    let seat2Plays = 0
+    const startHand = s.hands[GHOST_SEAT]!.length
+    let guard = 0
+    while (s.phase !== 'roundEnd' && s.phase !== 'gameEnd' && guard++ < 200) {
+      if (s.phase !== 'playing') break
+      const seat = currentSeat(s)
+      if (seat === null) break
+      if (seat === GHOST_SEAT) seat2Plays++
+      const legal = legalFor(s, seat)
+      s = reduce(s, { type: 'play', seat, cardId: legal[0]!.id }, rng)
+    }
+    // 좌석 2가 낸 횟수 = 좌석 2 손패가 줄어든 양. 저절로 나갔으면 이보다 많이 줄었을 것.
+    const consumed = startHand - (s.hands[GHOST_SEAT]?.length ?? 0)
+    expect(consumed).toBe(seat2Plays)
+  })
+})
+
+describe('2인 유령 변형은 여전히 자동으로 둔다', () => {
+  it('2인: 좌석 2(유령) 차례는 서버가 대신 둔다', () => {
+    const opts = makeSkOptions({ useGhostForTwoPlayers: true })
+    let s = createGame(2, opts, 0, createRng(1))
+    for (let seat = 0; seat < 2; seat++) s = reduce(s, { type: 'bid', seat, value: 0 }, createRng(1))
+    expect(s.phase).toBe('playing')
+    // playOut 이 무한 루프 없이 끝나면 유령이 자동으로 둬지고 있다는 뜻
+    const { final } = playOut(s)
+    expect(final.phase).toBe('gameEnd')
+  })
+})

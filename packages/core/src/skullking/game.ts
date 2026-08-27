@@ -166,6 +166,10 @@ function applyBid(state: SkGameState, seat: number, value: number): void {
 
 /** 유령 차례면 손패 맨 위를 그냥 뒤집어 낸다. 선택 없음. */
 function autoPlayGhost(state: SkGameState): void {
+  // **2인 유령 변형일 때만 대신 둔다.**
+  // 이 가드가 없으면 3인 이상 게임에서 좌석 2(GHOST_SEAT)에 앉은 진짜 사람의
+  // 카드를 유령으로 착각해 저절로 내버린다 — "3번째 사람 패가 자동으로 나가는" 버그.
+  if (!hasGhost(state.opts, state.humanCount)) return
   while (state.phase === 'playing' && currentSeat(state) === GHOST_SEAT) {
     const hand = state.hands[GHOST_SEAT] ?? []
     const card = hand.shift()
