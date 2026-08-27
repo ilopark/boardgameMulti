@@ -18,11 +18,35 @@ export interface PlayerPublic {
   isBot: boolean
 }
 
+/**
+ * 공개방은 코드를 몰라도 로비 목록에서 눌러 들어간다.
+ * 비밀방은 예전과 똑같이 코드를 아는 사람만 들어온다.
+ */
+export type RoomVisibility = 'public' | 'private'
+
+/** 로비 목록에 한 줄로 뜨는 공개방. 방 안 내용(손패 등)은 절대 포함하지 않는다. */
+export interface PublicRoomSummary {
+  code: string
+  game: GameId
+  /** 방장이 붙인 이름. 없으면 클라이언트가 기본 문구를 만든다. */
+  title: string | null
+  hostNickname: string
+  playerCount: number
+  seatCount: number
+  phase: RoomPhase
+  /** 목록에 "500점" · "2021판" 같은 배지를 띄우려고 함께 준다 */
+  options: Record<string, unknown>
+  createdAt: number
+}
+
 export interface RoomPublic {
   code: string
   game: GameId
   hostId: string
   phase: RoomPhase
+  visibility: RoomVisibility
+  /** 공개방 이름. 비밀방이면 null */
+  title: string | null
   players: PlayerPublic[]
   seatCount: number
   /**
@@ -60,7 +84,20 @@ export interface ChatMessage {
 
 /** 클라이언트 → 서버 */
 export interface ClientToServer {
-  'room:create': (p: { nickname: string; game: GameId }, cb: (r: Ack<{ room: RoomPublic; identity: Identity }>) => void) => void
+  'room:create': (
+    p: { nickname: string; game: GameId; visibility?: RoomVisibility; title?: string },
+    cb: (r: Ack<{ room: RoomPublic; identity: Identity }>) => void,
+  ) => void
+  /** 로비의 공개방 목록. 방에 들어가지 않아도 부를 수 있다. */
+  'lobby:list': (
+    p: { game?: GameId; waitingOnly?: boolean },
+    cb: (r: Ack<{ rooms: PublicRoomSummary[] }>) => void,
+  ) => void
+  /** 방장이 공개/비밀과 방 이름을 바꾼다 (대기 중에만) */
+  'room:visibility': (
+    p: { visibility: RoomVisibility; title?: string },
+    cb: (r: Ack<null>) => void,
+  ) => void
   'room:join': (p: { code: string; nickname: string; identity?: Identity }, cb: (r: Ack<{ room: RoomPublic; identity: Identity }>) => void) => void
   'room:leave': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   'room:sit': (p: { seat: number }, cb: (r: Ack<null>) => void) => void

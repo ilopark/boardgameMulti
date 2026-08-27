@@ -4,16 +4,30 @@
  */
 export type Rng = () => number
 
+/**
+ * 상태를 꺼낼 수 있는 난수. 게임 로직은 Rng(그냥 함수)만 알면 되고,
+ * 서버는 이걸 써서 진행 중인 방을 저장했다가 그대로 이어받는다.
+ *
+ * 이어받는 법: `createRng(rng.state)` — 다음에 나오는 수부터 원래와 똑같다.
+ */
+export interface SeededRng extends Rng {
+  /** mulberry32 의 내부 카운터. 이 값을 그대로 다시 시드로 넣으면 수열이 이어진다. */
+  state: number
+}
+
 /** mulberry32 */
-export function createRng(seed: number): Rng {
+export function createRng(seed: number): SeededRng {
   let a = seed >>> 0
-  return () => {
+  const rng = (() => {
     a = (a + 0x6d2b79f5) >>> 0
     let t = a
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    rng.state = a
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+  }) as SeededRng
+  rng.state = a
+  return rng
 }
 
 /** 문자열 시드 → 숫자 시드 (방 코드로 덱을 만들 때 사용) */

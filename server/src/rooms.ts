@@ -1,13 +1,16 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import {
   SEAT_COUNT,
+  createRng,
   type GameId,
   type PlayerPublic,
   type RoomPublic,
-  type Rng,
+  type RoomVisibility,
+  type SeededRng,
   type skullking,
   type tichu,
 } from '@bg/core'
+import type { PlayerSnapshot, RoomSnapshot } from './store/index.js'
 
 type SkGameState = skullking.SkGameState
 type TichuGameState = tichu.TichuGameState
@@ -23,6 +26,8 @@ export interface Player {
   disconnectedAt: number | null
   /** 방장이 추가한 봇이면 true. 서버가 자동으로 대신 행동한다. */
   isBot: boolean
+  /** 로그인한 계정이면 그 id. 게스트면 null — 전적을 남기지 않는다. */
+  userId: string | null
 }
 
 export interface Room {
@@ -30,6 +35,10 @@ export interface Room {
   game: GameId
   hostId: string
   phase: 'lobby' | 'playing' | 'finished'
+  /** 공개방은 로비 목록에 뜨고, 비밀방은 코드를 아는 사람만 들어온다 */
+  visibility: RoomVisibility
+  /** 공개방 이름. 비밀방이면 null */
+  title: string | null
   players: Map<string, Player>
   options: Record<string, unknown>
   /** 이번 라운드 딜러 좌석. 게임 시작 시 무작위로 정해진다. 대기 중엔 null. */
@@ -50,8 +59,11 @@ export interface Room {
   turnTimer: NodeJS.Timeout | null
   /** 지금 턴의 마감 시각(epoch ms). 없으면 null */
   turnDeadline: number | null
-  /** 카드를 돌릴 때 쓰는 난수. 방마다 하나를 계속 쓴다. */
-  rng: Rng | null
+  /**
+   * 카드를 돌릴 때 쓰는 난수. 방마다 하나를 계속 쓴다.
+   * SeededRng 라서 `rng.state` 를 저장해 두면 재시작 후 같은 수열을 이어받는다.
+   */
+  rng: SeededRng | null
   createdAt: number
 }
 
@@ -73,12 +85,19 @@ function generateCode(): string {
   throw new Error('방 코드 생성 실패')
 }
 
-export function createRoom(game: GameId, defaultOptions: Record<string, unknown>): Room {
+export function createRoom(
+  game: GameId,
+  defaultOptions: Record<string, unknown>,
+  visibility: RoomVisibility = 'private',
+  title: string | null = null,
+): Room {
   const room: Room = {
     code: generateCode(),
     game,
     hostId: '',
     phase: 'lobby',
+    visibility,
+    title,
     players: new Map(),
     options: defaultOptions,
     dealerSeat: null,
@@ -105,7 +124,7 @@ export function deleteRoom(code: string): void {
   rooms.delete(code)
 }
 
-export function addPlayer(room: Room, nickname: string): Player {
+export function addPlayer(room: Room, nickname: string, userId: string | null = null): Player {
   const player: Player = {
     id: randomUUID(),
     token: randomBytes(24).toString('base64url'),
@@ -115,6 +134,7 @@ export function addPlayer(room: Room, nickname: string): Player {
     ready: false,
     disconnectedAt: null,
     isBot: false,
+    userId,
   }
   room.players.set(player.id, player)
   if (!room.hostId) room.hostId = player.id
@@ -148,6 +168,7 @@ export function addBot(room: Room): Player | null {
     ready: true,
     disconnectedAt: null,
     isBot: true,
+    userId: null,
   }
   room.players.set(bot.id, bot)
   return bot
@@ -180,6 +201,8 @@ export function toPublic(room: Room): RoomPublic {
     game: room.game,
     hostId: room.hostId,
     phase: room.phase,
+    visibility: room.visibility,
+    title: room.title,
     players,
     seatCount: SEAT_COUNT[room.game],
     dealerSeat: room.dealerSeat,
@@ -283,4 +306,102 @@ export function applySeatArrangement(room: Room, arrangement: readonly number[])
     if (player) player.seat = gameSeat
   })
   room.seatArrangement = [...arrangement]
+}
+
+// ── 저장소 오가기 ──────────────────────────────────────────────
+// 방을 Redis 에 넣었다 되살리기 위한 변환.
+// 타이머 핸들과 소켓 ID 는 프로세스가 바뀌면 의미가 없어서 넘기지 않는다.
+
+export function toSnapshot(room: Room): RoomSnapshot {
+  return {
+    code: room.code,
+    game: room.game,
+    hostId: room.hostId,
+    phase: room.phase,
+    visibility: room.visibility,
+    title: room.title,
+    players: [...room.players.values()].map(
+      (p): PlayerSnapshot => ({
+        id: p.id,
+        token: p.token,
+        nickname: p.nickname,
+        seat: p.seat,
+        ready: p.ready,
+        isBot: p.isBot,
+        disconnectedAt: p.disconnectedAt,
+        userId: p.userId,
+      }),
+    ),
+    options: room.options,
+    dealerSeat: room.dealerSeat,
+    skGame: room.skGame,
+    tichuGame: room.tichuGame,
+    seatArrangement: room.seatArrangement,
+    tichuAutoPass: room.tichuAutoPass,
+    rngState: room.rng?.state ?? null,
+    turnDeadline: room.turnDeadline,
+    createdAt: room.createdAt,
+    updatedAt: Date.now(),
+  }
+}
+
+/**
+ * 스냅샷을 살아 있는 방으로 되돌린다.
+ *
+ * 되살아난 사람들은 전원 **끊긴 상태**로 시작한다. 소켓은 새로 붙어야 하는 것이고,
+ * 각자 브라우저에 있는 토큰으로 재접속하면서 원래 자리를 되찾는다.
+ * 게임 중이었다면 sweep 이 자리를 빼지 않으므로 기다려 주면 된다.
+ */
+export function fromSnapshot(s: RoomSnapshot): Room {
+  const players = new Map<string, Player>()
+  for (const p of s.players) {
+    players.set(p.id, {
+      id: p.id,
+      token: p.token,
+      nickname: p.nickname,
+      seat: p.seat,
+      socketId: null,
+      ready: p.ready,
+      // 서버가 죽어 있던 동안은 아무도 "끊긴 지 오래된" 것으로 치지 않는다.
+      // 그러지 않으면 재시작 직후 유예시간이 이미 지난 것으로 계산돼 전원이 쫓겨난다.
+      disconnectedAt: p.isBot ? null : Date.now(),
+      isBot: p.isBot,
+      userId: p.userId,
+    })
+  }
+  const room: Room = {
+    code: s.code,
+    game: s.game,
+    hostId: s.hostId,
+    phase: s.phase,
+    visibility: s.visibility,
+    title: s.title,
+    players,
+    options: s.options,
+    dealerSeat: s.dealerSeat,
+    skGame: s.skGame,
+    tichuGame: s.tichuGame,
+    seatArrangement: s.seatArrangement,
+    tichuAutoPass: s.tichuAutoPass,
+    advanceTimer: null,
+    botTimer: null,
+    turnTimer: null,
+    // 마감 시각은 그대로 살린다. 이미 지났으면 서버가 곧바로 시간초과 처리한다.
+    turnDeadline: s.turnDeadline,
+    rng: s.rngState === null ? null : createRng(s.rngState),
+    createdAt: s.createdAt,
+  }
+  rooms.set(room.code, room)
+  return room
+}
+
+/** 서버가 뜰 때 저장소에 있던 방들을 메모리로 올린다 */
+export function restoreAll(snapshots: RoomSnapshot[]): number {
+  for (const s of snapshots) fromSnapshot(s)
+  return snapshots.length
+}
+
+/** 모든 방 (스윕·통계용) */
+export function allRooms(): Room[] {
+  return [...rooms.values()]
 }
