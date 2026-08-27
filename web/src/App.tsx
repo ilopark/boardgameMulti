@@ -186,7 +186,11 @@ export default function App() {
   }, [auth])
 
   // 로그인했거나 게스트로 시작을 눌렀으면 로비로 들어간다
-  const inLobby = auth.user !== null || enteredAsGuest || !auth.enabled
+  // auth.loading 중에는 로비로 치지 않는다.
+  // 초기값 enabled=false 때문에 '!auth.enabled' 가 잠깐 참이 되어 inLobby 가 깜빡 true 가 되면,
+  // 게스트가 이름을 입력하기도 전에 아래 자동 입장이 이전 닉네임으로 실행돼 pendingCode 를
+  // 소거해 버린다 → 정작 게스트 이름을 넣으면 입장이 안 되는 버그.
+  const inLobby = !auth.loading && (auth.user !== null || enteredAsGuest || !auth.enabled)
 
   // 초대 링크로 들어왔으면, 로비에 들어서는 순간 그 방으로 자동 입장한다.
   // (미로그인이면 먼저 로그인/게스트를 거치고, 그게 끝나면 여기로 흘러온다)
