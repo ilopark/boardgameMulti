@@ -230,7 +230,8 @@ button { letter-spacing: 0.02em; }
 
 .seats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .seat button {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -269,15 +270,11 @@ button { letter-spacing: 0.02em; }
 .actions { flex-direction: row; flex-wrap: wrap; }
 .actions button { flex: 1; min-width: 100px; }
 
-/* 봇을 앉힌 자리 위에 겹쳐 뜨는 내보내기 버튼 */
-.seat { position: relative; }
+/* 좌석 = [좌석 버튼(이름) | 추방 버튼] 을 가로로 나란히 (absolute 겹침 방식은 위치가 꼬여서 flex 로 변경) */
+.seat { display: flex; align-items: center; gap: 6px; }
 .seat__kick {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
   flex: none;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: var(--bg);
   border: 1px solid var(--line);
@@ -286,8 +283,7 @@ button { letter-spacing: 0.02em; }
   white-space: nowrap;
 }
 .seat__kick:hover:not(:disabled) { color: var(--warn); border-color: var(--warn); }
-/* 내보내기 버튼이 자리표 오른쪽 내용과 겹치지 않게 여백을 준다 */
-.seat:has(.seat__kick) button { padding-right: 62px; }
+/* 추방 버튼은 이제 .seat 의 flex 아이템이라 별도 여백이 필요 없다 */
 
 .lobbytools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .lobbytools button { flex: 1; min-width: 110px; }
