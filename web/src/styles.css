@@ -6,8 +6,9 @@
   --bg: #07090f;
   --bg-glow-1: rgba(94, 72, 214, 0.18);
   --bg-glow-2: rgba(20, 150, 190, 0.12);
-  --surface: rgba(255, 255, 255, 0.035);
-  --surface-2: rgba(255, 255, 255, 0.06);
+  /* 불투명. (반투명이면 뒤에 깔린 배경 카드가 패널·입력창을 통해 비쳐 보인다) */
+  --surface: #101217;
+  --surface-2: #16181d;
   --line: rgba(125, 227, 255, 0.13);
   --text: #dde4f0;
   --muted: #5d6b85;
@@ -104,8 +105,9 @@ body {
   background: url(/bg-cards.webp) center / cover no-repeat;
   pointer-events: none;
 }
-/* 게임 몰입(스컬킹) 화면에서는 숨겨 방해하지 않는다 */
-.app--immersive::before { display: none; }
+/* 게임 진행 화면(스컬킹 몰입·티츄)에서는 배경을 숨겨 게임에 방해되지 않게 한다 */
+.app--immersive::before,
+.app--playing::before { display: none; }
 /* 라이트 모드에선 어두운 카드가 튀므로 연하게 */
 :root[data-theme='light'] .app::before { opacity: 0.28; }
 

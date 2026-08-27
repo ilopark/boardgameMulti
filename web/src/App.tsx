@@ -229,11 +229,13 @@ export default function App() {
   }, [pendingCode, room, inLobby, nickname, notify])
 
   // 스컬킹 게임 중에는 화면을 꽉 채우는 몰입형 레이아웃으로 전환한다
-  const immersive =
-    !IS_GALLERY && Boolean(room && myId && game) && room?.phase !== 'lobby' && room?.game === 'skullking'
+  // 게임 진행 화면(스컬킹·티츄 공통) — 배경 카드를 숨겨 게임에 방해되지 않게 한다
+  const inGame = !IS_GALLERY && Boolean(room && myId && game) && room?.phase !== 'lobby'
+  // 스컬킹만 몰입형 레이아웃(상단바·푸터 숨김)으로 전환한다
+  const immersive = inGame && room?.game === 'skullking'
 
   return (
-    <div className={immersive ? 'app app--immersive' : 'app'}>
+    <div className={immersive ? 'app app--immersive' : inGame ? 'app app--playing' : 'app'}>
       <header className="topbar">
         <span className="brand">보드게임</span>
         <span className="topbar__right">
