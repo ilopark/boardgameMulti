@@ -8,7 +8,7 @@
   --bg-glow-2: rgba(20, 150, 190, 0.12);
   /* 불투명. (반투명이면 뒤에 깔린 배경 카드가 패널·입력창을 통해 비쳐 보인다) */
   --surface: #101217;
-  --surface-2: #16181d;
+  --surface-2: #1c1f28;
   --line: rgba(125, 227, 255, 0.13);
   --text: #dde4f0;
   --muted: #5d6b85;
@@ -235,8 +235,8 @@ button { letter-spacing: 0.02em; }
   align-items: center;
   gap: 12px;
   background: var(--surface-2);
-  border: 1px solid transparent;
-  border-left: 3px solid var(--line);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-2);
   color: var(--text);
   text-align: left;
 }
@@ -247,7 +247,7 @@ button { letter-spacing: 0.02em; }
 }
 /* 남이 앉은 자리는 누를 수 없을 뿐 "비활성"이 아니다 — 기본 disabled 흐림을 되돌린다 */
 .seat button:disabled { opacity: 1; cursor: default; }
-.seat--empty button:disabled { opacity: 0.5; }
+.seat--empty button:disabled { opacity: 0.62; }
 .seatno {
   font-family: var(--font-mono);
   width: 26px; height: 26px; flex: none;
