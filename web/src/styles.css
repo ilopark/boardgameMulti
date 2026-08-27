@@ -229,7 +229,7 @@ button { letter-spacing: 0.02em; }
 .codebadge small { font-size: 9px; letter-spacing: 0.06em; color: var(--muted); font-weight: 400; font-family: var(--font-body); }
 
 .seats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.seat button {
+.seat button:not(.seat__kick) {
   flex: 1;
   min-width: 0;
   display: flex;
