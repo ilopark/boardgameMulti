@@ -20,7 +20,8 @@
     "bots": "node tools/bots.mjs",
     "share": "node tools/share.mjs",
     "start": "NODE_ENV=production node server/dist/index.js",
-    "check:infra": "tsx server/src/tools/check.ts"
+    "check:infra": "tsx server/src/tools/check.ts",
+    "test:restart": "node tools/restart-test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

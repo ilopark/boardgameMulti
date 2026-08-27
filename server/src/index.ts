@@ -1,3 +1,9 @@
+// **가장 먼저 .env 를 읽는다.** 아래 모듈들이 최상위에서 process.env 를 보기 때문에
+// 순서가 밀리면 이미 undefined 로 굳은 채 시작한다.
+import { loadEnv } from './env.js'
+
+loadEnv()
+
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { resolve } from 'node:path'
@@ -18,6 +24,10 @@ import {
   type GameId,
   type ServerToClient,
 } from '@bg/core'
+import { setupAuth, type Accounts, type Account } from './auth/index.js'
+import { AuthError } from './auth/types.js'
+import { RateLimiter, clientIp } from './ratelimit.js'
+import { createRoomStore, toSummary, type RoomStore } from './store/index.js'
 import {
   addBot,
   addPlayer,
@@ -33,6 +43,9 @@ import {
   shuffleSeats,
   sweep,
   toPublic,
+  toSnapshot,
+  restoreAll,
+  allRooms,
   type Room,
 } from './rooms.js'
 
@@ -49,6 +62,10 @@ const ORIGIN: string | boolean = process.env.CORS_ORIGIN ?? !IS_PROD
 interface SocketData {
   roomCode?: string
   playerId?: string
+  /** 로그인했다면 그 계정. 게스트면 undefined */
+  account?: Account | undefined
+  /** 로그아웃할 때 지울 세션 토큰 */
+  authToken?: string | undefined
 }
 
 /**
@@ -108,6 +125,8 @@ function defaultOptions(game: GameId): Record<string, unknown> {
 
 function broadcast(room: Room): void {
   io.to(room.code).emit('room:state', toPublic(room))
+  // 화면이 바뀌었다는 건 방 상태가 바뀌었다는 뜻이다 — 저장소도 따라가게 한다
+  persist(room)
 }
 
 /** 각자에게 **자기 것만 보이는** 게임 뷰를 보낸다. 사람마다 내용이 다르다. */
@@ -422,6 +441,24 @@ function afterGameChange(room: Room): void {
   scheduleAdvance(room)
   scheduleBots(room)
   broadcastGame(room)
+  persist(room)
+}
+
+/**
+ * 재시작 뒤 **첫 사람이 돌아왔을 때** 멈춰 있던 판의 시계를 다시 돌린다.
+ *
+ * 시계는 남은 시간이 아니라 **처음부터** 다시 준다. 서버가 꺼져 있던 건
+ * 플레이어 잘못이 아닌데 남은 3초를 물려주면 돌아오자마자 시간초과가 난다.
+ */
+function armTimersOnReturn(room: Room): void {
+  if (room.phase !== 'playing') return
+  // 이미 돌고 있으면 건드리지 않는다
+  if (room.turnTimer || room.advanceTimer) return
+  if (!room.skGame && !room.tichuGame) return
+
+  scheduleTurnTimeout(room)
+  scheduleAdvance(room)
+  scheduleBots(room)
 }
 
 function clearAdvanceTimer(room: Room): void {
@@ -484,8 +521,101 @@ function resetToLobby(room: Room): void {
   for (const p of room.players.values()) p.ready = p.isBot
 }
 
+/** 방 이름 정리. 안 보이는 글자로 목록을 어지럽히는 걸 막고 길이를 자른다. */
+function cleanRoomTitle(title: unknown): string | null {
+  if (typeof title !== 'string') return null
+  const cleaned = title
+    .normalize('NFC')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 20)
+  return cleaned.length > 0 ? cleaned : null
+}
+
+/**
+ * 인증 오류를 클라이언트에 보여줄 문구로 바꾼다.
+ * AuthError 가 아닌 것(DB 장애 등)은 속내를 드러내지 않고 뭉뚱그린다.
+ */
+function authMessage(err: unknown): string {
+  if (err instanceof AuthError) return err.message
+  console.error('[인증] 예상치 못한 오류', err)
+  return '지금은 처리할 수 없습니다. 잠시 뒤에 다시 시도해주세요.'
+}
+
 function isValidNickname(nickname: unknown): nickname is string {
   return typeof nickname === 'string' && nickname.trim().length >= 1 && nickname.trim().length <= 12
+}
+
+// ── 인증 · 저장소 ──────────────────────────────────────────────
+
+/** DB 가 없으면 null — 계정 기능만 꺼지고 게스트로 게임은 그대로 된다 */
+let accounts: Accounts | null = null
+/** 진행 중인 방을 담아두는 곳 (Redis 또는 메모리) */
+let roomStore: RoomStore | null = null
+
+/** 로그인 시도. 계정당 5분에 10번. */
+const loginLimiter = new RateLimiter(10, 5 * 60_000)
+/** 가입. IP 당 한 시간에 5개. */
+const signupLimiter = new RateLimiter(5, 60 * 60_000)
+/** 방 훔쳐보기. 코드를 무작위로 넣어 남의 비밀방을 찾는 걸 막는다. */
+const peekLimiter = new RateLimiter(20, 60_000)
+
+setInterval(() => {
+  loginLimiter.sweep()
+  signupLimiter.sweep()
+  peekLimiter.sweep()
+}, 5 * 60_000).unref()
+
+/**
+ * 방이 바뀔 때마다 저장소에 써 둔다.
+ *
+ * 기다리지 않는다 — 저장이 느리다고 게임이 멈추면 안 된다.
+ * 실패하면 로그만 남기고 넘어간다. 최악의 경우 재시작 때 그 방을 못 살릴 뿐,
+ * 지금 하고 있는 게임에는 영향이 없다.
+ */
+/** 저장 대기 중인 방들. 한 번의 처리 안에서 여러 번 불려도 쓰기는 한 번만 나간다. */
+const dirtyRooms = new Set<string>()
+let flushScheduled = false
+
+function persist(room: Room): void {
+  if (!roomStore) return
+  dirtyRooms.add(room.code)
+  if (flushScheduled) return
+  flushScheduled = true
+  // 지금 처리 중인 일이 다 끝난 뒤에 한꺼번에 내보낸다
+  setImmediate(flushDirtyRooms)
+}
+
+function flushDirtyRooms(): void {
+  flushScheduled = false
+  if (!roomStore) return
+  for (const code of dirtyRooms) {
+    const room = getRoom(code)
+    if (!room) continue
+    void roomStore.save(toSnapshot(room)).catch((err) => {
+      console.error(`[저장소] 방 ${code} 저장 실패`, err)
+    })
+  }
+  dirtyRooms.clear()
+}
+
+function forget(code: string): void {
+  if (!roomStore) return
+  void roomStore.remove(code).catch((err) => {
+    console.error(`[저장소] 방 ${code} 삭제 실패`, err)
+  })
+}
+
+function toAuthUser(account: Account) {
+  // 비밀번호와 관련된 건 아무것도 실어 보내지 않는다
+  return {
+    id: account.id,
+    username: account.username,
+    nickname: account.nickname,
+    tag: account.tag,
+  }
 }
 
 function currentRoomAndPlayer(socket: Socket<ClientToServer, ServerToClient, Record<string, never>, SocketData>) {
@@ -500,12 +630,145 @@ function currentRoomAndPlayer(socket: Socket<ClientToServer, ServerToClient, Rec
 }
 
 io.on('connection', (socket) => {
-  socket.on('room:create', ({ nickname, game }, cb) => {
+  const ip = clientIp(socket.handshake)
+
+  // ── 계정 ────────────────────────────────────────────────────
+
+  socket.on('auth:status', (_p, cb) => {
+    cb({
+      ok: true,
+      data: {
+        enabled: accounts !== null,
+        user: socket.data.account ? toAuthUser(socket.data.account) : null,
+      },
+    })
+  })
+
+  socket.on('auth:signup', ({ username, password, nickname }, cb) => {
+    if (!accounts) return cb({ ok: false, error: '지금은 계정 없이 게스트로만 이용할 수 있습니다.' })
+    if (!signupLimiter.take(ip)) {
+      return cb({ ok: false, error: '가입 시도가 너무 잦습니다. 잠시 뒤에 다시 해주세요.' })
+    }
+    void accounts
+      .signUp({ username, password, nickname, ip })
+      .then((session) => {
+        socket.data.account = session.account
+        socket.data.authToken = session.token
+        cb({
+          ok: true,
+          data: { user: toAuthUser(session.account), token: session.token, expiresAt: session.expiresAt },
+        })
+        console.log(`[가입] ${session.account.username}`)
+      })
+      .catch((err: unknown) => cb({ ok: false, error: authMessage(err) }))
+  })
+
+  socket.on('auth:login', ({ username, password }, cb) => {
+    if (!accounts) return cb({ ok: false, error: '지금은 계정 없이 게스트로만 이용할 수 있습니다.' })
+
+    // 아이디 기준으로 센다. IP 기준이면 같은 공유기를 쓰는 사람들이 서로 막힌다.
+    const key = typeof username === 'string' ? username.trim().toLowerCase() : ip
+    if (!loginLimiter.take(key)) {
+      const wait = loginLimiter.retryAfterSeconds(key)
+      return cb({ ok: false, error: `로그인 시도가 너무 잦습니다. ${wait}초 뒤에 다시 해주세요.` })
+    }
+
+    void accounts
+      .logIn({ username, password, ip })
+      .then((session) => {
+        loginLimiter.clear(key) // 성공했으면 실패 기록은 지운다
+        socket.data.account = session.account
+        socket.data.authToken = session.token
+        cb({
+          ok: true,
+          data: { user: toAuthUser(session.account), token: session.token, expiresAt: session.expiresAt },
+        })
+      })
+      .catch((err: unknown) => cb({ ok: false, error: authMessage(err) }))
+  })
+
+  socket.on('auth:resume', ({ token }, cb) => {
+    if (!accounts) return cb({ ok: true, data: { user: null } })
+    void accounts
+      .resume(token)
+      .then((account) => {
+        if (account) {
+          socket.data.account = account
+          socket.data.authToken = token
+        }
+        cb({ ok: true, data: { user: account ? toAuthUser(account) : null } })
+      })
+      // 토큰이 낡았거나 DB 가 잠깐 안 되는 것뿐이다. 로그인만 안 된 채로 게스트로 논다.
+      .catch(() => cb({ ok: true, data: { user: null } }))
+  })
+
+  socket.on('auth:logout', (_p, cb) => {
+    const token = socket.data.authToken
+    socket.data.account = undefined
+    socket.data.authToken = undefined
+    if (accounts && token) void accounts.logOut(token).catch(() => {})
+    cb({ ok: true })
+  })
+
+  // ── 로비 ────────────────────────────────────────────────────
+
+  socket.on('lobby:list', ({ game, waitingOnly }, cb) => {
+    const filter = {
+      ...(game === 'tichu' || game === 'skullking' ? { game } : {}),
+      ...(waitingOnly ? { waitingOnly: true } : {}),
+    }
+    if (!roomStore) return cb({ ok: true, data: { rooms: [] } })
+    void roomStore
+      .listPublic(filter)
+      .then((rooms) => cb({ ok: true, data: { rooms } }))
+      .catch((err: unknown) => {
+        console.error('[로비] 목록 조회 실패', err)
+        cb({ ok: false, error: '방 목록을 불러오지 못했습니다.' })
+      })
+  })
+
+  /**
+   * 초대 링크를 눌렀을 때, 들어가기 전에 어떤 방인지 보여주기 위한 것.
+   * 비밀방이라도 **코드를 아는 사람에게는** 요약을 준다 — 코드가 곧 열쇠다.
+   */
+  socket.on('room:peek', ({ code }, cb) => {
+    if (!peekLimiter.take(ip)) {
+      return cb({ ok: false, error: '요청이 너무 잦습니다. 잠시 뒤에 다시 해주세요.' })
+    }
+    const room = getRoom(code ?? '')
+    if (!room) return cb({ ok: false, error: '그런 방이 없습니다. 코드를 확인해주세요.' })
+    cb({ ok: true, data: toSummary(toSnapshot(room)) })
+  })
+
+  socket.on('room:visibility', ({ visibility, title }, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 바꿀 수 있습니다.' })
+    if (room.phase !== 'lobby') return cb({ ok: false, error: '게임 중에는 바꿀 수 없습니다.' })
+    if (visibility !== 'public' && visibility !== 'private') {
+      return cb({ ok: false, error: '알 수 없는 공개 설정입니다.' })
+    }
+
+    room.visibility = visibility
+    room.title = visibility === 'public' ? cleanRoomTitle(title) : null
+    cb({ ok: true })
+    broadcast(room)
+  })
+
+  socket.on('room:create', ({ nickname, game, visibility, title }, cb) => {
     if (!isValidNickname(nickname)) return cb({ ok: false, error: '닉네임은 1~12자로 입력해주세요.' })
     if (game !== 'tichu' && game !== 'skullking') return cb({ ok: false, error: '알 수 없는 게임입니다.' })
 
-    const room = createRoom(game, defaultOptions(game))
-    const player = addPlayer(room, nickname.trim())
+    const isPublic = visibility === 'public'
+    const room = createRoom(
+      game,
+      defaultOptions(game),
+      isPublic ? 'public' : 'private',
+      isPublic ? cleanRoomTitle(title) : null,
+    )
+    // 로그인한 사람이면 계정을 달아둔다 — 전적은 계정이 있는 사람만 쌓인다
+    const player = addPlayer(room, nickname.trim(), socket.data.account?.id ?? null)
     player.socketId = socket.id
     player.seat = firstFreeSeat(room)
 
@@ -515,7 +778,9 @@ io.on('connection', (socket) => {
 
     cb({ ok: true, data: { room: toPublic(room), identity: { playerId: player.id, token: player.token } } })
     broadcast(room)
-    console.log(`[방 생성] ${room.code} (${GAME_LABEL[game]}) by ${player.nickname}`)
+    console.log(
+      `[방 생성] ${room.code} (${GAME_LABEL[game]}, ${isPublic ? '공개' : '비밀'}) by ${player.nickname}`,
+    )
   })
 
   socket.on('room:join', ({ code, nickname, identity }, cb) => {
@@ -543,6 +808,8 @@ io.on('connection', (socket) => {
         socket.data.playerId = existing.id
         void socket.join(room.code)
         cb({ ok: true, data: { room: toPublic(room), identity } })
+        // 재시작 뒤 첫 복귀라면 멈춰 있던 시계를 여기서 다시 돌린다
+        armTimersOnReturn(room)
         broadcast(room)
         broadcastGame(room) // 새로고침해도 판이 그대로 보이도록
         return
@@ -553,7 +820,7 @@ io.on('connection', (socket) => {
     if (room.phase !== 'lobby') return cb({ ok: false, error: '이미 시작된 게임입니다.' })
     if (room.players.size >= SEAT_COUNT[room.game]) return cb({ ok: false, error: '방이 가득 찼습니다.' })
 
-    const player = addPlayer(room, nickname.trim())
+    const player = addPlayer(room, nickname.trim(), socket.data.account?.id ?? null)
     player.socketId = socket.id
     player.seat = firstFreeSeat(room)
 
@@ -894,7 +1161,10 @@ io.on('connection', (socket) => {
     cb({ ok: true })
     // 사람이 아무도 안 남으면(봇만 남아도) 방을 정리한다
     const anyHuman = [...room.players.values()].some((p) => !p.isBot)
-    if (!anyHuman) deleteRoom(room.code)
+    if (!anyHuman) {
+      deleteRoom(room.code)
+      forget(room.code)
+    }
     else broadcast(room)
   })
 
@@ -910,10 +1180,13 @@ io.on('connection', (socket) => {
 })
 
 setInterval(() => {
-  for (const code of sweep()) {
+  const { changed, removed } = sweep()
+  for (const code of changed) {
     const room = getRoom(code)
     if (room) broadcast(room)
   }
+  // 사라진 방은 저장소에서도 뺀다 — 안 그러면 로비 목록에 유령 방이 남는다
+  for (const code of removed) forget(code)
 }, 30_000).unref()
 
 /**
@@ -930,9 +1203,46 @@ process.on('unhandledRejection', (reason) => {
   console.error('[처리되지 않은 프로미스 거부 — 서버는 계속 돕니다]', reason)
 })
 
-// 컨테이너에서는 0.0.0.0에 바인딩해야 외부 트래픽이 들어온다
-http.listen(PORT, '0.0.0.0', () => {
-  const corsLabel =
-    ORIGIN === true ? '전체 허용 — 개발용' : ORIGIN === false ? '같은 오리진만' : String(ORIGIN)
-  console.log(`보드게임 서버 http://localhost:${PORT}  (CORS: ${corsLabel})`)
+/**
+ * 서버 부팅.
+ *
+ * 붙을 곳에 다 붙은 **뒤에** 포트를 연다. 순서가 뒤집히면 첫 몇 초 동안
+ * 들어온 사람들이 계정도 못 쓰고 저장도 안 되는 상태로 게임을 시작하게 된다.
+ */
+async function bootstrap(): Promise<void> {
+  const auth = await setupAuth()
+  accounts = auth.accounts
+
+  roomStore = await createRoomStore()
+
+  // 재시작 전에 돌던 방들을 되살린다
+  try {
+    const saved = await roomStore.loadAll()
+    const restored = restoreAll(saved)
+    if (restored > 0) {
+      console.log(`[복원] 진행 중이던 방 ${restored}개를 되살렸습니다`)
+      // **타이머는 여기서 걸지 않는다.**
+      // 되살아난 방은 전원 끊긴 상태다. 지금 제한시간을 걸면 아무도 못 돌아온 사이에
+      // 서버가 자동 플레이로 판을 끝까지 진행시켜 버린다.
+      // 사람이 하나라도 돌아오면 그때 건다 (armTimersOnReturn).
+      for (const room of allRooms()) room.turnDeadline = null
+    }
+  } catch (err) {
+    // 되살리기에 실패해도 서버는 뜬다 — 새 방은 만들 수 있어야 하니까
+    console.error('[복원] 실패 — 빈 상태로 시작합니다', err)
+  }
+
+  // 컨테이너에서는 0.0.0.0에 바인딩해야 외부 트래픽이 들어온다
+  http.listen(PORT, '0.0.0.0', () => {
+    const corsLabel =
+      ORIGIN === true ? '전체 허용 — 개발용' : ORIGIN === false ? '같은 오리진만' : String(ORIGIN)
+    console.log(`보드게임 서버 http://localhost:${PORT}  (CORS: ${corsLabel})`)
+  })
+}
+
+void bootstrap().catch((err: unknown) => {
+  // 여기서 죽는 건 설정이 잘못됐다는 뜻이다. 반쯤 동작하는 서버를 띄우는 것보다
+  // 지금 멈추고 무엇이 문제인지 보여주는 편이 낫다.
+  console.error('[부팅 실패]', err)
+  process.exit(1)
 })

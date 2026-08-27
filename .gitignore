@@ -8,3 +8,4 @@ data/*.db
 
 # 디자인 시안 산출물 — 에디터가 통째로 들어가 2MB가 넘는다. 소스(.dc.html)만 남긴다.
 design/*.html
+tools/.restart-state.json

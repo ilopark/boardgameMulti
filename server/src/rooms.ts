@@ -218,10 +218,18 @@ export function reassignHostIfNeeded(room: Room): void {
   room.hostId = human ? human.id : ''
 }
 
+export interface SweepResult {
+  /** 사람이 빠져서 화면을 다시 그려야 하는 방 */
+  changed: string[]
+  /** 통째로 사라진 방. 저장소에서도 빼야 로비에 유령 방이 남지 않는다. */
+  removed: string[]
+}
+
 /** 끊긴 지 오래된 플레이어와 빈 방 정리 */
-export function sweep(disconnectGraceMs = 3 * 60_000, emptyRoomTtlMs = 10 * 60_000): string[] {
+export function sweep(disconnectGraceMs = 3 * 60_000, emptyRoomTtlMs = 10 * 60_000): SweepResult {
   const now = Date.now()
   const changed: string[] = []
+  const removed: string[] = []
   for (const [code, room] of rooms) {
     let dirty = false
     // **게임 중에는 아무도 내보내지 않는다.**
@@ -241,11 +249,12 @@ export function sweep(disconnectGraceMs = 3 * 60_000, emptyRoomTtlMs = 10 * 60_0
     const stale = now - room.createdAt > emptyRoomTtlMs
     if ((room.players.size === 0 || !anyoneConnected) && stale) {
       rooms.delete(code)
+      removed.push(code)
       continue
     }
     if (dirty) changed.push(code)
   }
-  return changed
+  return { changed, removed }
 }
 
 export function roomCount(): number {

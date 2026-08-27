@@ -70,6 +70,22 @@ export interface Identity {
   token: string
 }
 
+/** 로그인한 사람. 비밀번호와 관련된 건 아무것도 들어 있지 않다. */
+export interface AuthUser {
+  id: string
+  username: string
+  nickname: string
+  /** 닉네임이 겹쳐도 구분되도록 붙는 네 자리 (리로#4821) */
+  tag: string
+}
+
+export interface AuthResult {
+  user: AuthUser
+  /** 브라우저가 보관할 세션 토큰. 서버에는 이 값의 해시만 남는다. */
+  token: string
+  expiresAt: number
+}
+
 /** 방 안에서만 오가는 채팅 한 줄. 저장하지 않고 방이 사라지면 함께 사라진다. */
 export interface ChatMessage {
   id: string
@@ -88,6 +104,28 @@ export interface ClientToServer {
     p: { nickname: string; game: GameId; visibility?: RoomVisibility; title?: string },
     cb: (r: Ack<{ room: RoomPublic; identity: Identity }>) => void,
   ) => void
+  // ── 계정 ──
+  // DB 가 없으면 계정 기능이 통째로 꺼진다. 그때도 게스트로 게임은 그대로 된다.
+  /** 계정 기능이 켜져 있는지 + 지금 로그인돼 있는지 */
+  'auth:status': (
+    p: Record<string, never>,
+    cb: (r: Ack<{ enabled: boolean; user: AuthUser | null }>) => void,
+  ) => void
+  'auth:signup': (
+    p: { username: string; password: string; nickname: string },
+    cb: (r: Ack<AuthResult>) => void,
+  ) => void
+  'auth:login': (p: { username: string; password: string }, cb: (r: Ack<AuthResult>) => void) => void
+  /** 브라우저에 있던 토큰으로 로그인 상태를 되찾는다 */
+  'auth:resume': (p: { token: string }, cb: (r: Ack<{ user: AuthUser | null }>) => void) => void
+  'auth:logout': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
+
+  /**
+   * 코드만으로 방을 미리 들여다본다 (초대 링크용).
+   * 들어가기 전에 "어떤 방인지" 를 보여주려는 것이라 참가자 이름 같은 건 주지 않는다.
+   */
+  'room:peek': (p: { code: string }, cb: (r: Ack<PublicRoomSummary>) => void) => void
+
   /** 로비의 공개방 목록. 방에 들어가지 않아도 부를 수 있다. */
   'lobby:list': (
     p: { game?: GameId; waitingOnly?: boolean },
