@@ -58,7 +58,21 @@ interface SocketData {
  */
 const webDist = process.env.WEB_DIST ?? resolve(import.meta.dirname, '../../web/dist')
 const serveWeb = existsSync(webDist)
-  ? sirv(webDist, { single: true, gzip: true, brotli: true, maxAge: 3600 })
+  ? sirv(webDist, {
+      single: true,
+      gzip: true,
+      brotli: true,
+      maxAge: 3600,
+      /**
+       * 요청마다 파일 시스템을 다시 확인한다.
+       *
+       * 이게 없으면 sirv가 **서버 시작 시점의 파일 목록을 캐시**한다.
+       * 게임이 도는 중에 npm run build를 돌리면 파일이 통째로 바뀌는데,
+       * 캐시된 목록은 사라진 파일을 가리키고 있어서 읽다가 죽는다.
+       * 요청당 stat 한 번이 늘 뿐이라 이 규모에선 비용이 없다시피 하다.
+       */
+      dev: true,
+    })
   : null
 
 if (serveWeb) console.log(`정적 파일 서빙: ${webDist}`)
@@ -901,6 +915,20 @@ setInterval(() => {
     if (room) broadcast(room)
   }
 }, 30_000).unref()
+
+/**
+ * 마지막 방어선.
+ *
+ * 요청 하나가 잘못됐다고 **모두의 게임이 끝나면 안 된다.**
+ * 정적 파일 스트림 오류처럼 프로세스 상태와 무관한 예외가 대부분이라
+ * 크게 남기고 계속 돈다. 진짜로 못 살릴 상태면 다음 요청에서 다시 터진다.
+ */
+process.on('uncaughtException', (err) => {
+  console.error('[치명적이지 않은 예외 — 서버는 계속 돕니다]', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[처리되지 않은 프로미스 거부 — 서버는 계속 돕니다]', reason)
+})
 
 // 컨테이너에서는 0.0.0.0에 바인딩해야 외부 트래픽이 들어온다
 http.listen(PORT, '0.0.0.0', () => {
