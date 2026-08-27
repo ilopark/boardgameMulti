@@ -92,7 +92,22 @@ body {
   max-width: 1500px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
 }
+
+/* ── 배경: 흩뿌린 카드 (로비·로그인·대기실이 심심하지 않게) ── */
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url(/bg-cards.webp) center / cover no-repeat;
+  pointer-events: none;
+}
+/* 게임 몰입(스컬킹) 화면에서는 숨겨 방해하지 않는다 */
+.app--immersive::before { display: none; }
+/* 라이트 모드에선 어두운 카드가 튀므로 연하게 */
+:root[data-theme='light'] .app::before { opacity: 0.28; }
 
 .topbar {
   display: flex;
@@ -579,6 +594,8 @@ button { letter-spacing: 0.02em; }
   box-shadow: 0 3px 8px var(--shadow);
 }
 .pcard--lg { width: 172px; height: 241px; }
+/* 손패 카드만 20% 작게 (카드가 너무 크다는 사용자 요청). 낸 카드·상대 카드는 그대로. */
+.handcard .pcard--lg { width: 138px; height: 193px; }
 .pcard--md { width: 112px; height: 157px; }
 .pcard--sm { width: 62px; height: 87px; }
 
@@ -753,6 +770,7 @@ button { letter-spacing: 0.02em; }
 @media (max-width: 560px) {
   .main { padding: 12px; }
   .pcard--lg { width: 96px; height: 134px; }
+  .handcard .pcard--lg { width: 77px; height: 107px; } /* 손패 카드만 20% 작게 */
   .pcard--md { width: 74px; height: 104px; }
   .board { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
   .tablerow { min-height: 156px; gap: 12px; }
