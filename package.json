@@ -19,7 +19,8 @@
     "typecheck": "npm run build:core && tsc --noEmit -p server && tsc --noEmit -p web",
     "bots": "node tools/bots.mjs",
     "share": "node tools/share.mjs",
-    "start": "NODE_ENV=production node server/dist/index.js"
+    "start": "NODE_ENV=production node server/dist/index.js",
+    "check:infra": "tsx server/src/tools/check.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
