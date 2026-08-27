@@ -122,7 +122,7 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
                       )
                     }
                   >
-                    ×
+                    추방
                   </button>
                 )}
               </li>
