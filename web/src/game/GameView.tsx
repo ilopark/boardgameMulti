@@ -9,6 +9,17 @@ type SkCard = skullking.SkCard
 
 const GHOST_SEAT = 2
 
+/**
+ * 내 차례가 시작된 직후 이만큼은 카드 클릭을 무시한다.
+ *
+ * 손패는 트릭 결과(trickEnd) 화면에서도 같은 자리에 그대로 있다가 다음 트릭이 시작되면
+ * 곧바로 클릭 가능해진다. 모바일에서는 trickEnd 동안 손패를 무심코 건드린 터치가
+ * 지연 발화(고스트 클릭)해서, 트릭이 시작되자마자 카드가 저절로 제출되는 일이 생긴다.
+ * 스컬킹은 카드 클릭 = 확인 없이 즉시 제출이라 이 한 번이 돌이킬 수 없다.
+ * 사람은 카드를 고르는 데 최소 1초는 걸리므로 이 짧은 무시가 정상 플레이를 방해하지 않는다.
+ */
+const PLAY_COOLDOWN_MS = 350
+
 const LEAD_LABEL: Record<string, string> = {
   green: '앵무새(초록)',
   yellow: '보물상자(노랑)',
@@ -58,7 +69,22 @@ export default function GameView({ room, view, remainingMs, waitingFor, seq, isH
   const myBidPending = view.phase === 'bidding' && view.myBid === null
   const legal = new Set(view.legal)
 
+  // 내 차례(playing)가 막 시작된 시각. 그 직후의 고스트 클릭을 걸러내려고 본다.
+  // **렌더 중에** 기록한다 — useEffect(화면을 그린 뒤 실행)에 두면, 전환 직후의 클릭이
+  // useEffect보다 먼저 들어와 시각이 아직 0인 채로 통과해 버린다(고스트 클릭이 새어 든다).
+  const canPlayNow = myTurn && view.phase === 'playing'
+  const playReadyAt = useRef(0)
+  const wasReady = useRef(false)
+  if (canPlayNow && !wasReady.current) {
+    playReadyAt.current = Date.now()
+    wasReady.current = true
+  } else if (!canPlayNow && wasReady.current) {
+    wasReady.current = false
+  }
+
   const playCard = (card: SkCard) => {
+    // 트릭이 막 시작된 직후의 클릭은 무시한다 — 직전 화면에서 새어 든 고스트 클릭일 수 있다
+    if (Date.now() - playReadyAt.current < PLAY_COOLDOWN_MS) return
     if (card.kind === 'tigress') {
       setTigressPick(card)
       return

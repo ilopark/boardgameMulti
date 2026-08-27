@@ -171,6 +171,19 @@ function clearTurnTimer(room: Room): void {
 }
 
 /**
+ * 지금 기다리는 좌석 중 **자리를 비운(소켓이 끊긴) 사람**이 있는가.
+ * 봇은 서버가 대신 두므로 세지 않는다.
+ */
+function someoneAwaitingIsGone(room: Room): boolean {
+  const waiting = new Set(waitingSeatsOf(room))
+  for (const p of room.players.values()) {
+    if (p.seat === null || p.isBot) continue
+    if (waiting.has(p.seat) && p.socketId === null) return true
+  }
+  return false
+}
+
+/**
  * 제한시간을 건다. 시간이 다 되면 서버가 대신 행동한다.
  * 트릭 테이킹은 "패스"가 없어서 누군가 자리를 비우면 판 전체가 멈추기 때문.
  */
@@ -208,8 +221,12 @@ function scheduleTurnTimeout(room: Room): void {
     playing: TURN_POLICY.playMs,
     dragonGift: TURN_POLICY.playMs,
   }
-  const limit = THINKING[phase]
-  if (limit === undefined) return
+  const base = THINKING[phase]
+  if (base === undefined) return
+
+  // 자리 비운(백그라운드/끊김) 사람 차례면 자동 제출을 미룬다 — 돌아올 시간을 준다.
+  // 재접속하면 아래 재연결 경로에서 이 함수를 다시 불러 정상 시간으로 리셋한다.
+  const limit = someoneAwaitingIsGone(room) ? Math.max(base, TURN_POLICY.disconnectGraceMs) : base
 
   room.turnDeadline = Date.now() + limit
   room.turnTimer = setTimeout(() => handleTurnTimeout(room), limit)
@@ -811,6 +828,15 @@ io.on('connection', (socket) => {
         // 재시작 뒤 첫 복귀라면 멈춰 있던 시계를 여기서 다시 돌린다
         armTimersOnReturn(room)
         broadcast(room)
+        // 자리 비운 사이 유예(90초)로 늘어나 있던 타이머를, 돌아왔으니 정상 시간으로 리셋한다.
+        // 이 사람이 지금 낼 차례가 아니면 건드리지 않는다(남의 타이머를 리셋하면 안 된다).
+        if (
+          existing.seat !== null &&
+          (room.skGame || room.tichuGame) &&
+          waitingSeatsOf(room).includes(existing.seat)
+        ) {
+          scheduleTurnTimeout(room)
+        }
         broadcastGame(room) // 새로고침해도 판이 그대로 보이도록
         return
       }
@@ -1175,6 +1201,13 @@ io.on('connection', (socket) => {
     // 즉시 제거하지 않는다 — 새로고침/터널 끊김으로 자리를 잃으면 안 되니까
     player.socketId = null
     player.disconnectedAt = Date.now()
+    // **끊긴 사람이 지금 낼 차례였다면 타이머를 다시 건다.**
+    // 타이머는 턴이 시작될 때 걸리는데, 그 순간엔 아직 연결돼 있어 정상 30초로 걸린다.
+    // 여기서 다시 걸어야 someoneAwaitingIsGone 이 반영돼 90초 유예로 늘어난다.
+    // (안 그러면 모바일이 백그라운드 간 직후 30초에 카드가 자동 제출된다)
+    if (player.seat !== null && (room.skGame || room.tichuGame) && waitingSeatsOf(room).includes(player.seat)) {
+      scheduleTurnTimeout(room)
+    }
     broadcast(room)
   })
 })
