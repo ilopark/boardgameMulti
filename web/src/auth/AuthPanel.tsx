@@ -3,8 +3,10 @@ import type { Auth } from './useAuth.js'
 
 interface Props {
   auth: Auth
-  /** 계정 없이 그냥 시작 */
-  onGuest: () => void
+  /** 계정 없이 게스트 닉네임으로 시작 */
+  onGuest: (nickname: string) => void
+  /** 초대 링크로 들어온 방 코드가 있으면 안내 문구를 띄운다 */
+  invitedCode?: string | null
   onError: (message: string) => void
 }
 
@@ -16,12 +18,15 @@ type Mode = 'signup' | 'login'
  * **게스트를 막지 않는다.** 친구가 보낸 링크를 눌렀는데 회원가입부터 나오면
  * 그냥 안 온다. 로그인은 "전적이 쌓인다" 는 유인으로만 권한다.
  */
-export default function AuthPanel({ auth, onGuest, onError }: Props) {
+export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props) {
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [busy, setBusy] = useState(false)
+  // '게스트로 시작' 을 누르면 닉네임부터 받는다 (로비에서 비활성 버튼에 헷갈리지 않게)
+  const [guestNaming, setGuestNaming] = useState(false)
+  const [guestName, setGuestName] = useState('')
 
   const submit = async () => {
     if (busy) return
@@ -41,19 +46,72 @@ export default function AuthPanel({ auth, onGuest, onError }: Props) {
     password.length >= 8 &&
     (mode === 'login' || nickname.trim().length >= 1)
 
+  // ── 게스트 닉네임 입력 단계 ──
+  if (guestNaming) {
+    const ok = guestName.trim().length >= 1
+    return (
+      <div className="authpanel">
+        <div className="authpanel__brand">
+          <span className="authpanel__logo">♠</span>
+          <h1>티츄 · 스컬킹</h1>
+          {invitedCode ? (
+            <p className="muted">
+              <b>{invitedCode}</b> 방에 초대받았어요 — 이름만 정하면 바로 입장!
+            </p>
+          ) : (
+            <p className="muted">게임에 보일 이름을 정해주세요</p>
+          )}
+        </div>
+        <section className="card">
+          <form
+            className="authform"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (ok) onGuest(guestName.trim())
+            }}
+          >
+            <label className="field">
+              <span>게스트 이름</span>
+              <input
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                maxLength={12}
+                placeholder="1~12자 (한글 가능)"
+                autoComplete="off"
+                autoFocus
+              />
+            </label>
+            <button type="submit" className="primary" disabled={!ok}>
+              {invitedCode ? '입장하기' : '시작하기'}
+            </button>
+          </form>
+          {auth.enabled && (
+            <button type="button" className="linkbtn authpanel__back" onClick={() => setGuestNaming(false)}>
+              ← 로그인 / 회원가입으로
+            </button>
+          )}
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="authpanel">
       <div className="authpanel__brand">
         <span className="authpanel__logo">♠</span>
         <h1>티츄 · 스컬킹</h1>
-        <p className="muted">친구랑, 혹은 낯선 사람과 한 판</p>
+        {invitedCode ? (
+          <p className="muted"><b>{invitedCode}</b> 방에 초대받았어요</p>
+        ) : (
+          <p className="muted">친구랑, 혹은 낯선 사람과 한 판</p>
+        )}
       </div>
 
       {/* 계정 기능이 꺼져 있으면(서버에 DB 미연결) 게스트 시작만 보여준다 */}
       {!auth.enabled ? (
         <section className="card authpanel__guestonly">
           <p className="muted">지금은 계정 없이 이용할 수 있어요.</p>
-          <button type="button" className="primary" onClick={onGuest}>
+          <button type="button" className="primary" onClick={() => setGuestNaming(true)}>
             시작하기
           </button>
         </section>
@@ -134,7 +192,7 @@ export default function AuthPanel({ auth, onGuest, onError }: Props) {
 
           <div className="authdivider"><span>또는</span></div>
 
-          <button type="button" className="ghost authpanel__guest" onClick={onGuest}>
+          <button type="button" className="ghost authpanel__guest" onClick={() => setGuestNaming(true)}>
             게스트로 시작
           </button>
           <p className="authhint muted">게스트는 전적이 쌓이지 않아요.</p>

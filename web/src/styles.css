@@ -1357,3 +1357,6 @@ button { letter-spacing: 0.02em; }
     animation: none;
   }
 }
+
+/* 게스트 닉네임 단계의 '로그인/회원가입으로' 뒤로가기 */
+.authpanel__back { margin-top: 12px; display: inline-block; }

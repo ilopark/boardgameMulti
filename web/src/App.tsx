@@ -43,6 +43,16 @@ export default function App() {
   // 게스트로 "시작하기" 를 눌렀는지. 로그인 사용자는 자동으로 통과한다.
   const [enteredAsGuest, setEnteredAsGuest] = useState(false)
   const [nickname, setNickname] = useState(loadNickname)
+  // 초대 링크(?j=ABC123)로 들어왔으면 그 방 코드. 로비에 들어가면 자동으로 입장한다.
+  const [pendingCode, setPendingCode] = useState<string | null>(() => {
+    try {
+      const raw = new URLSearchParams(location.search).get('j')
+      const code = raw?.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+      return code && code.length === 6 ? code : null
+    } catch {
+      return null
+    }
+  })
 
   useEffect(() => {
     applyTheme(theme)
@@ -178,6 +188,42 @@ export default function App() {
   // 로그인했거나 게스트로 시작을 눌렀으면 로비로 들어간다
   const inLobby = auth.user !== null || enteredAsGuest || !auth.enabled
 
+  // 초대 링크로 들어왔으면, 로비에 들어서는 순간 그 방으로 자동 입장한다.
+  // (미로그인이면 먼저 로그인/게스트를 거치고, 그게 끝나면 여기로 흘러온다)
+  useEffect(() => {
+    if (!pendingCode || room || !inLobby) return
+    if (!nickname.trim()) return // 게스트인데 아직 이름이 없으면 기다린다
+    let cancelled = false
+    const join = async () => {
+      try {
+        const res = await request('room:join', { code: pendingCode, nickname })
+        if (cancelled) return
+        setRoom(res.room)
+        setMyId(res.identity.playerId)
+        saveIdentity(res.room.code, res.identity)
+      } catch (e) {
+        if (!cancelled) notify(e instanceof Error ? e.message : '방에 들어가지 못했습니다.')
+      } finally {
+        if (!cancelled) {
+          setPendingCode(null)
+          // 주소창에서 ?j= 를 지운다 (새로고침해도 다시 입장 시도하지 않게)
+          try {
+            const url = new URL(location.href)
+            url.searchParams.delete('j')
+            history.replaceState(null, '', url.pathname + url.search)
+          } catch {
+            /* 무시 */
+          }
+        }
+      }
+    }
+    if (socket.connected) void join()
+    else socket.once('connect', () => void join())
+    return () => {
+      cancelled = true
+    }
+  }, [pendingCode, room, inLobby, nickname, notify])
+
   // 스컬킹 게임 중에는 화면을 꽉 채우는 몰입형 레이아웃으로 전환한다
   const immersive =
     !IS_GALLERY && Boolean(room && myId && game) && room?.phase !== 'lobby' && room?.game === 'skullking'
@@ -240,7 +286,15 @@ export default function App() {
             onError={notify}
           />
         ) : (
-          <AuthPanel auth={auth} onGuest={() => setEnteredAsGuest(true)} onError={notify} />
+          <AuthPanel
+            auth={auth}
+            invitedCode={pendingCode}
+            onGuest={(guestName) => {
+              handleNickname(guestName)
+              setEnteredAsGuest(true)
+            }}
+            onError={notify}
+          />
         )}
       </main>
 

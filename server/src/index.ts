@@ -1150,6 +1150,33 @@ io.on('connection', (socket) => {
     broadcast(room)
   })
 
+  socket.on('room:kick', ({ playerId }, cb) => {
+    const ctx = currentRoomAndPlayer(socket)
+    if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })
+    const { room, player } = ctx
+    if (room.hostId !== player.id) return cb({ ok: false, error: '방장만 내보낼 수 있습니다.' })
+    if (room.phase !== 'lobby') return cb({ ok: false, error: '게임 중에는 내보낼 수 없습니다.' })
+    if (playerId === player.id) return cb({ ok: false, error: '자신은 내보낼 수 없습니다.' })
+    const target = room.players.get(playerId)
+    if (!target) return cb({ ok: false, error: '그런 사람이 없습니다.' })
+
+    // 쫓겨난 사람의 소켓을 방에서 떼어내고 로비로 돌려보낸다
+    if (target.socketId) {
+      const sock = io.sockets.sockets.get(target.socketId)
+      if (sock) {
+        sock.emit('room:closed', { reason: '방장이 내보냈습니다.' })
+        delete sock.data.roomCode
+        delete sock.data.playerId
+        void sock.leave(room.code)
+      }
+    }
+    room.players.delete(playerId)
+    reassignHostIfNeeded(room) // (방장은 자신을 못 쫓아내지만 방어적으로)
+    cb({ ok: true })
+    broadcast(room)
+    persist(room)
+  })
+
   socket.on('chat:send', ({ text }, cb) => {
     const ctx = currentRoomAndPlayer(socket)
     if (!ctx) return cb({ ok: false, error: '방에 들어와 있지 않습니다.' })

@@ -150,6 +150,8 @@ export interface ClientToServer {
   'room:addBot': (p: Record<string, never>, cb: (r: Ack<null>) => void) => void
   /** 방장이 봇을 내보낸다 */
   'room:removeBot': (p: { playerId: string }, cb: (r: Ack<null>) => void) => void
+  /** 방장이 사람을 내보낸다 (대기 중에만). 나간 사람은 로비로 튕긴다. */
+  'room:kick': (p: { playerId: string }, cb: (r: Ack<null>) => void) => void
 
   // ── 게임 진행 ──
   'game:bid': (p: { value: number }, cb: (r: Ack<null>) => void) => void

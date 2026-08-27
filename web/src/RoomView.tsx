@@ -40,12 +40,15 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
     }
   }
 
-  const copyCode = async () => {
+  // 코드만 주면 상대가 '사이트 링크 + 코드' 두 번을 받아야 한다.
+  // 링크에 코드를 심어(?j=CODE) 한 번에 그 방으로 들어오게 한다.
+  const inviteLink = `${location.origin}${location.pathname}?j=${room.code}`
+  const copyInvite = async () => {
     try {
-      await navigator.clipboard.writeText(room.code)
-      onError('방 코드를 복사했습니다.')
+      await navigator.clipboard.writeText(inviteLink)
+      onError('초대 링크를 복사했습니다. 붙여넣어 보내면 바로 입장돼요.')
     } catch {
-      onError('복사에 실패했습니다. 직접 입력해주세요.')
+      onError(`복사 실패. 링크: ${inviteLink}`)
     }
   }
 
@@ -70,9 +73,14 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
               {seated.length}/{room.seatCount}명
             </p>
           </div>
-          <button type="button" className="codebadge" onClick={() => void copyCode()}>
+          <button
+            type="button"
+            className="codebadge"
+            onClick={() => void copyInvite()}
+            title="초대 링크 복사"
+          >
             {room.code}
-            <small>탭해서 복사</small>
+            <small>탭해서 초대 링크 복사</small>
           </button>
         </div>
       </section>
@@ -101,14 +109,18 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
                     {p?.ready && !p.isBot && room.phase === 'lobby' && <em className="tag tag--ok">준비</em>}
                   </span>
                 </button>
-                {isHost && room.phase === 'lobby' && p?.isBot && (
+                {isHost && room.phase === 'lobby' && p && p.id !== myId && (
                   <button
                     type="button"
                     className="seat__kick"
                     disabled={busy}
-                    title="봇 내보내기"
+                    title={p.isBot ? '봇 내보내기' : '내보내기'}
                     aria-label={`${p.nickname} 내보내기`}
-                    onClick={() => void run(() => request('room:removeBot', { playerId: p.id }))}
+                    onClick={() =>
+                      void run(() =>
+                        request(p.isBot ? 'room:removeBot' : 'room:kick', { playerId: p.id }),
+                      )
+                    }
                   >
                     ×
                   </button>

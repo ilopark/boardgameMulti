@@ -88,16 +88,10 @@ export default function LobbyHome({
               </button>
             </>
           ) : (
-            <label className="field field--inline">
-              <span>닉네임</span>
-              <input
-                value={nickname}
-                onChange={(e) => onNicknameChange(e.target.value)}
-                maxLength={12}
-                placeholder="게스트 이름"
-                autoComplete="off"
-              />
-            </label>
+            <>
+              <span className="lobbyhome__nick">{nickname}</span>
+              <span className="lobbyhome__tag">게스트</span>
+            </>
           )}
         </div>
         <button
