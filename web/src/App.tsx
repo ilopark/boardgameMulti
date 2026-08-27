@@ -123,6 +123,10 @@ export default function App() {
 
   // 새로고침 후 자동 재입장
   useEffect(() => {
+    // 초대 링크(?j=)로 들어온 경우엔 아래 '자동 입장' 이 재접속까지 함께 처리한다.
+    // 여기서도 room:join 을 쏘면 같은 소켓이 두 번 입장해 서버가 '다른 기기 접속' 으로
+    // 오인하고 room:closed 를 보내 로비로 튕긴다.
+    if (pendingCode) return
     const saved = loadIdentity()
     if (!saved) return
     let cancelled = false
@@ -196,7 +200,11 @@ export default function App() {
     let cancelled = false
     const join = async () => {
       try {
-        const res = await request('room:join', { code: pendingCode, nickname })
+        // 같은 방에 이미 들어갔던 적이 있으면(새로고침·재클릭) 그 신원으로 재접속한다.
+        // 신원 없이 또 들어가면 유령 플레이어가 하나 더 생기고 소켓이 꼬인다.
+        const saved = loadIdentity()
+        const reconnect = saved && saved.code === pendingCode ? { identity: saved.identity } : {}
+        const res = await request('room:join', { code: pendingCode, nickname, ...reconnect })
         if (cancelled) return
         setRoom(res.room)
         setMyId(res.identity.playerId)
