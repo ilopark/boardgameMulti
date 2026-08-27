@@ -1,0 +1,23 @@
+name: Deploy to Oracle
+
+on:
+  push:
+    branches: [main]
+
+# 연속 push 시 배포가 겹치지 않게 한 번에 하나만
+concurrency:
+  group: deploy-oracle
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH 로 서버에 배포 (git pull + build + restart)
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 161.33.213.129
+          username: ubuntu
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 15m
+          script: bash ~/deploy.sh
