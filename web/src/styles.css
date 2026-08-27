@@ -429,11 +429,21 @@ button { letter-spacing: 0.02em; }
      데스크톱처럼 overflow:hidden 으로 두면 넘친 부분이 잘려서 아예 만질 수 없다.
      입찰 패널이 위에 있으니 기본 화면에는 그대로 보이고, 손패만 스크롤로 닿게 된다. */
   .skstage { overflow-y: auto; }
-  /* 가운데(테이블) 영역을 별도 스크롤 창으로 두면, 세로가 부족한 폰에서 그 창 높이에 맞춰
-     카드 밑 라벨(예: '초록 12')이 잘려 손패 패널에 가린 것처럼 보인다.
-     스크롤은 스테이지 전체에 맡기고, 이 영역은 내용만큼 자연 높이로 펼쳐 라벨까지 다 보이게 한다.
-     → 어떤 화면 크기에서도 테이블 카드/라벨이 손패에 안 가린다. */
-  .skstage__mid { flex: none; overflow: visible; min-height: auto; }
+  /* ── 손패는 항상 화면 맨 아래 고정 (어지럼 방지) ──
+     가운데(테이블) 영역이 '남는 공간 전부'를 차지하게 두면, 테이블에 카드가 있든 없든
+     이 영역 높이가 일정 → 그 아래 손패 위치가 안 변한다(위아래로 안 흔들림).
+     대신 테이블은 아래에서 '고정 높이 가로 스크롤 스트립'으로 만들어(카드가 늘어도 세로로
+     안 커지고, 카드 밑 라벨도 안 잘림) 손패를 밀어내지 않게 한다. */
+  .skstage__mid { flex: 1 1 auto; overflow: hidden; }
+  .skstage__mid > .panel { min-height: 0; overflow: hidden; }
+  /* 테이블 카드 줄: 여러 장이어도 줄바꿈 없이 가로로 스크롤 → 높이 일정 */
+  .tablerow {
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+    min-height: 0; align-items: flex-start;
+  }
+  .played { flex: 0 0 auto; }
+  /* 테이블 카드만 조금 더 작게 — 카드+색숫자 라벨+이름이 세로로 다 들어오게 */
+  .skstage .played .pcard--lg { width: 84px; height: 118px; }
   .skrail {
     /* 세로 배치에서는 flex-basis가 '폭'이 아니라 '높이'로 해석된다.
        300px 를 그대로 두면 점수판이 화면 높이의 37%를 먹어 입찰 버튼 자리가 사라진다. */
@@ -448,9 +458,13 @@ button { letter-spacing: 0.02em; }
   .railseats { flex-direction: row; margin-top: 0; }
   .railseat { flex: 0 0 auto; }
   .skrail__abort { margin-top: 0; width: auto; flex: none; }
-  .skstage { padding: 14px; }
-  .skstatus__title { font-size: 24px; }
-  .bigcount__num { font-size: 34px; }
+  .skstage { padding: 14px 14px 10px; gap: 10px; }
+  /* 상단 상태 영역을 압축해 세로 공간을 벌린다 → 테이블 카드 밑 라벨이 잘리지 않게 */
+  .skstatus { gap: 6px; }
+  .skstatus__title { font-size: 22px; }
+  .skstatus__sub { font-size: 13px; }
+  .bigcount { gap: 12px; }
+  .bigcount__num { font-size: 30px; min-width: 46px; }
 }
 
 .panel {
