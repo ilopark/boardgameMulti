@@ -392,7 +392,7 @@ button { letter-spacing: 0.02em; }
 }
 /* 손패는 카드가 있든 없든 같은 높이 → 단계가 바뀌어도 위아래로 안 흔들린다 */
 .skstage > .hand { flex: none; }
-.skstage .handrow { min-height: 275px; }
+.skstage .handrow { min-height: 227px; } /* 손패 카드 20% 축소에 맞춰 트레이 높이도 축소 */
 /* 가운데(입찰/테이블/결과)는 남는 공간을 전부 차지하고, 그 아래 손패는 항상 화면 맨 아래 고정.
    → 단계가 바뀌어(테이블 카드가 생겼다 없어졌다) 손패가 위아래로 흔들리지 않는다. */
 .skstage__mid {
@@ -776,7 +776,7 @@ button { letter-spacing: 0.02em; }
   .pcard--md { width: 74px; height: 104px; }
   .board { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
   .tablerow { min-height: 156px; gap: 12px; }
-  .hand .handrow:has(.pcard) { min-height: 168px; }
+  .hand .handrow:has(.pcard) { min-height: 141px; } /* 손패 카드 축소에 맞춰 */
   /* 10라운드는 버튼이 0~10 으로 11개다. 데스크톱 크기(52×50)면 폰에서 3줄을 먹는다. */
   .bid { min-width: 44px; height: 44px; font-size: 17px; }
   .tally__won { font-size: 26px; }
