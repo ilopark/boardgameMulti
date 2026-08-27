@@ -77,11 +77,10 @@ export default function GameView({ room, view, remainingMs, waitingFor, seq, isH
 
   return (
     <div className={railOpen ? 'skgame' : 'skgame skgame--railclosed'}>
-      {/* 좌측 레일: 플레이어 점수판 (접기 가능) — 폭은 inline 으로 확실히 제어 */}
-      <aside
-        className="skrail"
-        style={railOpen ? { flexBasis: 300 } : { flexBasis: 54, padding: '14px 8px', overflow: 'hidden' }}
-      >
+      {/* 좌측 레일: 플레이어 점수판 (접기 가능).
+          폭은 CSS 에 맡긴다 — inline 으로 주면 모바일 세로 배치에서 그 값이 '높이'로 해석돼
+          점수판이 화면을 먹고 가운데(입찰 버튼) 자리가 사라진다. */}
+      <aside className={railOpen ? 'skrail' : 'skrail skrail--closed'}>
         <div className="skrail__head">
           <button
             type="button"
