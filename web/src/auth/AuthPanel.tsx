@@ -111,6 +111,27 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
         )}
       </div>
 
+      {/* 비로그인·비초대 방문자에게 사이트 소개와 규칙 링크를 먼저 보여준다
+          (첫 화면이 로그인 박스만 있으면 콘텐츠가 없어 보인다) */}
+      {!invitedCode && (
+        <section className="authland">
+          <p className="authland__intro">
+            설치·가입 없이 브라우저에서 바로 즐기는 <b>무료 온라인 보드게임</b>이에요.
+            친구를 초대하거나 봇과 함께 티츄·스컬킹 한 판 하세요.
+          </p>
+          <div className="authland__games">
+            <a className="authland__game" href="/guide/tichu/">
+              <b>티츄</b>
+              <span>규칙 보기 →</span>
+            </a>
+            <a className="authland__game" href="/guide/skullking/">
+              <b>스컬킹</b>
+              <span>규칙 보기 →</span>
+            </a>
+          </div>
+        </section>
+      )}
+
       {/* 계정 기능이 꺼져 있으면(서버에 DB 미연결) 게스트 시작만 보여준다 */}
       {!auth.enabled ? (
         <section className="card authpanel__guestonly">

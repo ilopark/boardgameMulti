@@ -1548,3 +1548,67 @@ textarea:focus {
 .post__reply strong { display: block; font-size: 12px; color: var(--accent); margin-bottom: 4px; }
 .post__reply p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 14px; }
 .post__actions { display: flex; gap: 14px; margin-top: 2px; }
+
+/* ═══════════ 광고 슬롯 ═══════════ */
+.adslot {
+  width: 100%;
+  max-width: 728px;
+  margin: 16px auto 4px;
+  text-align: center;
+}
+.adslot__label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+/* 개발 중 자리 표시(배포 실사용자에겐 렌더되지 않음) */
+.adslot--ph {
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: var(--r);
+  padding: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* ═══════════ 첫 화면 랜딩(비로그인) ═══════════ */
+.authland {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.authland__intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  text-align: center;
+}
+.authland__intro b { color: var(--accent); }
+.authland__games {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.authland__game {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.authland__game:hover { border-color: var(--accent); transform: translateY(-2px); }
+.authland__game b { font-size: 16px; }
+.authland__game span { font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .authland__game { transition: none; }
+}

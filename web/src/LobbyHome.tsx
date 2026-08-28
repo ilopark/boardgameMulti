@@ -8,6 +8,7 @@ import {
   type RoomVisibility,
 } from '@bg/core'
 import { request } from './socket.js'
+import AdSlot from './ads.js'
 import type { AuthUser } from '@bg/core'
 
 interface Props {
@@ -195,6 +196,8 @@ export default function LobbyHome({
           </ul>
         )}
       </section>
+
+      <AdSlot slot="" label="광고" />
     </div>
   )
 }

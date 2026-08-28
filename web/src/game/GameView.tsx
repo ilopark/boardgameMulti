@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TURN_POLICY, type RoomPublic, type skullking } from '@bg/core'
 import { request } from '../socket.js'
+import AdSlot from '../ads.js'
 import Card from './Card.js'
 import Countdown from './Countdown.js'
 
@@ -587,6 +588,7 @@ function GameEnd({ view, nameOf }: { view: View; nameOf: (seat: number) => strin
           </li>
         ))}
       </ol>
+      <AdSlot slot="" label="광고" />
     </section>
   )
 }

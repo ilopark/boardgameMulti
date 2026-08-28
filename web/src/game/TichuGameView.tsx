@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TURN_POLICY, tichu, type RoomPublic } from '@bg/core'
 import { request } from '../socket.js'
+import AdSlot from '../ads.js'
 import Countdown from './Countdown.js'
 import TichuCard, { CardBack, rankLabel, tichuCardLabel } from './TichuCard.js'
 
@@ -813,6 +814,7 @@ function TichuGameEnd({ view, nameOf }: { view: View; nameOf: (s: number) => str
           </li>
         ))}
       </ol>
+      <AdSlot slot="" label="광고" />
     </section>
   )
 }
