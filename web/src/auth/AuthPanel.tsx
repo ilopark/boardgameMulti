@@ -116,8 +116,7 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
       {!invitedCode && (
         <section className="authland">
           <p className="authland__intro">
-            설치·가입 없이 브라우저에서 바로 즐기는 <b>무료 온라인 보드게임</b>이에요.
-            친구를 초대하거나 봇과 함께 티츄·스컬킹 한 판 하세요.
+            설치·가입 없이 즐기는 <b>무료 온라인 보드게임</b>. 친구·봇과 티츄·스컬킹 한 판 하세요.
           </p>
           <div className="authland__games">
             <div className="authland__game">
