@@ -1381,12 +1381,6 @@ summary:focus-visible {
 .lobbyhome__me { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .lobbyhome__nick { font-weight: 700; font-size: 16px; color: var(--text); }
 .lobbyhome__tag { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
-.lobbyhome__rec {
-  font-size: 12px; font-weight: 700; color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
-  border-radius: 999px; padding: 2px 9px; font-variant-numeric: tabular-nums;
-}
 .linkbtn {
   background: none; border: none; color: var(--muted); font-size: 13px;
   text-decoration: underline; padding: 2px 4px;
