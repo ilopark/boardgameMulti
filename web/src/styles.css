@@ -1058,11 +1058,14 @@ summary:focus-visible {
 .topbar__link {
   font-size: 13px;
   color: var(--muted);
+  background: transparent;
+  cursor: pointer;
   text-decoration: none;
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
   white-space: nowrap;
+  line-height: 1.4;
 }
 .topbar__link:hover { color: var(--text); border-color: var(--accent); }
 @media (max-width: 560px) {

@@ -79,14 +79,14 @@ a:focus-visible,
   align-items: center;
   gap: 8px;
 }
-.site-header nav a {
+.site-header nav a:not(.btn) {
   color: var(--muted);
   text-decoration: none;
   font-size: 14px;
   padding: 6px 10px;
   border-radius: 6px;
 }
-.site-header nav a:hover { color: var(--text); background: var(--surface-2); }
+.site-header nav a:not(.btn):hover { color: var(--text); background: var(--surface-2); }
 
 .btn {
   display: inline-block;
