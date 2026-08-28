@@ -98,6 +98,22 @@ export interface ChatMessage {
   ts: number
 }
 
+/** 커뮤니티/문의 게시판의 글 하나. 로그인 사용자만 쓰고, 관리자만 전체를 본다. */
+export interface Post {
+  id: number
+  /** 작성 시점의 표시 이름(닉네임#태그) 스냅샷 */
+  authorName: string
+  title: string
+  body: string
+  /** 관리자 답변. 없으면 null */
+  reply: string | null
+  repliedAt: number | null
+  createdAt: number
+  updatedAt: number
+  /** 내가 쓴 글인가 — 수정·삭제 버튼 표시용 */
+  mine: boolean
+}
+
 /** 클라이언트 → 서버 */
 export interface ClientToServer {
   'room:create': (
@@ -184,6 +200,19 @@ export interface ClientToServer {
   'tichu:wish': (p: { rank: number | null }, cb: (r: Ack<null>) => void) => void
   /** 용으로 딴 트릭을 상대팀 누구에게 줄지 */
   'tichu:dragon': (p: { to: number }, cb: (r: Ack<null>) => void) => void
+
+  // ── 커뮤니티 / 문의 게시판 ──
+  // 관리자(ilo2918)는 전체 글을, 로그인 사용자는 본인 글만, 게스트는 아무 글도 못 본다.
+  // 쓰기·수정·삭제는 로그인 사용자만(본인 글). 삭제는 관리자도 가능. 답변은 관리자만.
+  'posts:list': (
+    p: Record<string, never>,
+    cb: (r: Ack<{ posts: Post[]; isAdmin: boolean; canWrite: boolean }>) => void,
+  ) => void
+  'posts:create': (p: { title: string; body: string }, cb: (r: Ack<{ post: Post }>) => void) => void
+  'posts:update': (p: { id: number; title: string; body: string }, cb: (r: Ack<null>) => void) => void
+  'posts:delete': (p: { id: number }, cb: (r: Ack<null>) => void) => void
+  /** 관리자 답변 (관리자만) */
+  'posts:reply': (p: { id: number; reply: string }, cb: (r: Ack<null>) => void) => void
 }
 
 /** 서버 → 클라이언트 */

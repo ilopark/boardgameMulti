@@ -141,6 +141,28 @@ create table if not exists boardgame.room_events (
 create index if not exists room_events_at_idx on boardgame.room_events (at desc);
 create index if not exists room_events_kind_idx on boardgame.room_events (kind, at desc);
 
+-- ── 커뮤니티 / 문의 게시판 ─────────────────────────────────────
+--
+-- 로그인 사용자만 글을 쓴다. 관리자(ilo2918)는 전체를, 일반 사용자는 자기 글만 본다.
+-- 게스트는 아무 글도 보지 못한다(권한은 서버 코드에서 강제한다).
+
+create table if not exists boardgame.posts (
+  id          bigserial primary key,
+  author_id   uuid not null references boardgame.users(id) on delete cascade,
+  -- 작성 시점의 표시 이름(닉네임#태그) 스냅샷. 닉네임이 바뀌어도 글은 그대로.
+  author_name text not null,
+  title       text not null,
+  body        text not null,
+  -- 관리자 답변 (관리자만 채운다)
+  reply       text,
+  replied_at  timestamptz,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists posts_author_idx  on boardgame.posts (author_id, created_at desc);
+create index if not exists posts_created_idx on boardgame.posts (created_at desc);
+
 -- ── 관리자용 집계 뷰 ───────────────────────────────────────────
 
 -- 하루에 몇 명이 왔나 (계정 + 게스트)
@@ -214,3 +236,4 @@ alter table boardgame.visits        enable row level security;
 alter table boardgame.games         enable row level security;
 alter table boardgame.game_players  enable row level security;
 alter table boardgame.room_events   enable row level security;
+alter table boardgame.posts         enable row level security;

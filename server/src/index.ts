@@ -25,6 +25,7 @@ import {
   type ServerToClient,
 } from '@bg/core'
 import { setupAuth, type Accounts, type Account } from './auth/index.js'
+import { createPost, deletePost, isAdmin, listPosts, PostError, replyPost, updatePost } from './posts.js'
 import { AuthError } from './auth/types.js'
 import { RateLimiter, clientIp } from './ratelimit.js'
 import { createRoomStore, toSummary, type RoomStore } from './store/index.js'
@@ -739,6 +740,53 @@ io.on('connection', (socket) => {
     socket.data.authToken = undefined
     if (accounts && token) void accounts.logOut(token).catch(() => {})
     cb({ ok: true })
+  })
+
+  // ── 커뮤니티 / 문의 게시판 ────────────────────────────────────
+  // 관리자(ilo2918) 전체 열람, 로그인 사용자는 본인 글만, 게스트는 열람 UI만(글 없음).
+  const postFail = (cb: (r: { ok: false; error: string }) => void) => (e: unknown) => {
+    if (!(e instanceof PostError)) console.error('[게시판]', e)
+    cb({ ok: false, error: e instanceof PostError ? e.message : '게시판 처리 중 오류가 발생했습니다.' })
+  }
+
+  socket.on('posts:list', (_p, cb) => {
+    if (!accounts) return cb({ ok: false, error: '지금은 게시판을 쓸 수 없습니다.' })
+    const account = socket.data.account ?? null
+    void listPosts(account)
+      .then((posts) => cb({ ok: true, data: { posts, isAdmin: isAdmin(account), canWrite: account !== null } }))
+      .catch(postFail(cb))
+  })
+
+  socket.on('posts:create', ({ title, body }, cb) => {
+    const account = socket.data.account
+    if (!account) return cb({ ok: false, error: '로그인이 필요합니다.' })
+    void createPost(account, title, body)
+      .then((post) => cb({ ok: true, data: { post } }))
+      .catch(postFail(cb))
+  })
+
+  socket.on('posts:update', ({ id, title, body }, cb) => {
+    const account = socket.data.account
+    if (!account) return cb({ ok: false, error: '로그인이 필요합니다.' })
+    void updatePost(account, id, title, body)
+      .then(() => cb({ ok: true }))
+      .catch(postFail(cb))
+  })
+
+  socket.on('posts:delete', ({ id }, cb) => {
+    const account = socket.data.account
+    if (!account) return cb({ ok: false, error: '로그인이 필요합니다.' })
+    void deletePost(account, id)
+      .then(() => cb({ ok: true }))
+      .catch(postFail(cb))
+  })
+
+  socket.on('posts:reply', ({ id, reply }, cb) => {
+    const account = socket.data.account
+    if (!account) return cb({ ok: false, error: '로그인이 필요합니다.' })
+    void replyPost(account, id, reply)
+      .then(() => cb({ ok: true }))
+      .catch(postFail(cb))
   })
 
   // ── 로비 ────────────────────────────────────────────────────

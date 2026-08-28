@@ -8,6 +8,7 @@ import Chat from './Chat.js'
 import LobbyHome from './LobbyHome.js'
 import type { RoomVisibility } from '@bg/core'
 import RoomView from './RoomView.js'
+import Community from './Community.js'
 
 // 게임 화면·갤러리는 초기 로딩엔 필요 없다 → 필요할 때 따로 불러온다(코드 스플릿).
 // 로비/로그인 첫 진입 번들에서 큰 게임 UI와 관련 코드를 빼서 초기 로딩을 가볍게 한다.
@@ -46,6 +47,14 @@ export default function App() {
   // 게스트로 "시작하기" 를 눌렀는지. 로그인 사용자는 자동으로 통과한다.
   const [enteredAsGuest, setEnteredAsGuest] = useState(false)
   const [nickname, setNickname] = useState(loadNickname)
+  // 커뮤니티/문의 게시판 화면. 정적 페이지에서 /?community 로 들어오면 자동으로 열린다.
+  const [showCommunity, setShowCommunity] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(location.search).has('community')
+    } catch {
+      return false
+    }
+  })
   // 초대 링크(?j=ABC123)로 들어왔으면 그 방 코드. 로비에 들어가면 자동으로 입장한다.
   const [pendingCode, setPendingCode] = useState<string | null>(() => {
     try {
@@ -188,6 +197,18 @@ export default function App() {
     setEnteredAsGuest(false) // 로그인 화면으로 돌아간다
   }, [auth])
 
+  const closeCommunity = useCallback(() => {
+    setShowCommunity(false)
+    // 주소창의 ?community 를 지운다 (새로고침해도 다시 열리지 않게)
+    try {
+      const url = new URL(location.href)
+      url.searchParams.delete('community')
+      history.replaceState(null, '', url.pathname + url.search)
+    } catch {
+      /* 무시 */
+    }
+  }, [])
+
   // 로그인했거나 게스트로 "시작하기"를 눌렀으면 로비로 들어간다.
   // auth.loading 중에는 로비로 치지 않는다.
   // 계정 기능이 꺼진(DB 없는) 서버라도 여기서 바로 로비로 보내지 않는다.
@@ -244,6 +265,9 @@ export default function App() {
         <span className="brand"><span aria-hidden="true">♠</span> 보드플레이</span>
         <span className="topbar__right">
           <a className="topbar__link" href="/guide/">📖 게임 방법</a>
+          <button type="button" className="topbar__link" onClick={() => setShowCommunity(true)}>
+            💬 커뮤니티
+          </button>
           <span
             className={connected ? 'status status--on' : 'status status--off'}
             role="status"
@@ -264,6 +288,9 @@ export default function App() {
       </header>
 
       <main className="main" id="main">
+        {showCommunity ? (
+          <Community user={auth.user} onClose={closeCommunity} onError={notify} />
+        ) : (
         <Suspense fallback={<div className="bootwait muted">불러오는 중…</div>}>
         {IS_GALLERY && <CardGallery />}
         {IS_GALLERY ? null : room && myId && game && room.phase !== 'lobby' ? (
@@ -314,6 +341,7 @@ export default function App() {
           />
         )}
         </Suspense>
+        )}
       </main>
 
       <footer className="footer">

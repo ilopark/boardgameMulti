@@ -1493,3 +1493,55 @@ summary:focus-visible {
 
 /* 게스트 닉네임 단계의 '로그인/회원가입으로' 뒤로가기 */
 .authpanel__back { margin-top: 12px; display: inline-block; }
+
+/* ═══════════ 커뮤니티 / 문의 게시판 ═══════════ */
+textarea {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  width: 100%;
+  resize: vertical;
+  line-height: 1.6;
+}
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.community { max-width: 720px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.community__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.community__head h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.community__notice { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); text-align: center; }
+.community__admin {
+  margin: 0; font-size: 13px; font-weight: 600; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--r); padding: 8px 12px;
+}
+.community__new { align-self: flex-start; }
+.community__form { gap: 14px; }
+.community__textarea { min-height: 120px; }
+.community__formactions { display: flex; justify-content: flex-end; gap: 8px; }
+.community__formactions .ghost, .community__formactions .primary { width: auto; padding: 10px 20px; }
+.community__empty { text-align: center; padding: 40px 16px; }
+
+.postlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.post { gap: 8px; }
+.post__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.post__title { font-size: 17px; margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.post__date { font-size: 12px; color: var(--muted); white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
+.post__author { font-size: 12px; color: var(--accent-2); font-weight: 600; }
+.post__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-size: 15px; }
+.post__reply {
+  margin-top: 4px; padding: 12px 14px; border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  border-left: 3px solid var(--accent);
+}
+.post__reply strong { display: block; font-size: 12px; color: var(--accent); margin-bottom: 4px; }
+.post__reply p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 14px; }
+.post__actions { display: flex; gap: 14px; margin-top: 2px; }
