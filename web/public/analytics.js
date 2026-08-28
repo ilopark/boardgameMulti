@@ -7,7 +7,7 @@
  * 아직 ID를 안 넣었으면(플레이스홀더 그대로면) 아무것도 로드하지 않습니다 → 안전.
  */
 ;(function () {
-  var GA4_ID = 'G-XXXXXXXXXX' // ← 여기에 실제 측정 ID 입력
+  var GA4_ID = 'G-KZFBSP16H4' // ← GA4 측정 ID
 
   if (!GA4_ID || GA4_ID.indexOf('XXXX') !== -1) return // 미설정이면 조용히 종료
 
