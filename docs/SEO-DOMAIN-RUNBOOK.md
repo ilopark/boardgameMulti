@@ -113,6 +113,16 @@ npm run deploy
 - 신청 전 확인: 콘텐츠 충분(규칙·전략·계산기 등), 개인정보처리방침(있음)·소개(있음), HTTPS(있음), 정상 동작.
 - **계정 주의**: 구글은 개인당 애드센스 1개 원칙. 이 사이트를 (a) 분리 계정으로 신규 신청 vs (b) 기존 계정에 사이트 추가 — 저작권 리스크 격리 ↔ 복수계정 문제의 트레이드오프. 그 시점에 애드센스 정책 확인 후 결정.
 
+### 승인 후 광고 켜는 법 (자리는 이미 배치돼 있음)
+
+광고 슬롯은 이미 코드에 심어져 있고(로비 하단, 스컬킹·티츄 **게임 종료 순위 아래**), 승인 전엔 실사용자에게 안 보인다. 켜려면 **3곳만** 채운다:
+
+1. **`web/index.html`** — `<head>` 의 `adsbygoogle.js` 주석을 풀고 `client=ca-pub-...` 를 본인 게시자 ID로.
+2. **`web/src/ads.tsx`** — `ADSENSE_CLIENT = ''` → `'ca-pub-XXXXXXXXXXXXXXXX'`.
+3. 각 `<AdSlot slot="...">` — 애드센스에서 만든 광고단위 ID(data-ad-slot 숫자)를 넣는다. 현재 위치: `web/src/LobbyHome.tsx`, `web/src/game/GameView.tsx`, `web/src/game/TichuGameView.tsx`.
+
+그 뒤 `npm run deploy`. **정책 주의**: 새 광고 자리는 반드시 게임 조작 버튼(입찰·카드)과 떨어진 곳에만 — 실수 클릭 유발 = 계정 제재. (지금 배치된 3곳은 안전지대.)
+
 ---
 
 ## 10. 아직 안 채운 placeholder
