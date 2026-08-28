@@ -3,13 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>보드게임</title>
+    <title>티츄 · 스컬킹 온라인 — 무료 멀티플레이 보드게임 | 보드플레이</title>
 
     <!-- 링크 미리보기 (Open Graph / 트위터 카드) -->
-    <meta name="description" content="친구랑, 혹은 낯선 사람과 한 판. 티츄 · 스컬킹 온라인." />
+    <meta
+      name="description"
+      content="설치 없이 브라우저에서 바로 즐기는 티츄·스컬킹 온라인. 친구랑 방을 만들어 무료로 멀티플레이하고, 규칙도 한글로 정리했습니다."
+    />
+    <meta name="keywords" content="티츄, 스컬킹, 온라인, 무료, 보드게임, 멀티플레이, 카드게임, 규칙, tichu, skull king" />
+    <link rel="canonical" href="https://boardplay.dpdns.org/" />
+    <meta name="theme-color" content="#f4f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="보드게임 · 티츄 & 스컬킹" />
-    <meta property="og:description" content="친구랑, 혹은 낯선 사람과 한 판. 티츄 · 스컬킹 온라인." />
+    <meta property="og:site_name" content="보드플레이" />
+    <meta property="og:title" content="티츄 · 스컬킹 온라인 — 무료 멀티플레이 보드게임" />
+    <meta
+      property="og:description"
+      content="설치 없이 브라우저에서 바로. 친구랑 방을 만들어 무료로 티츄·스컬킹을 즐기세요."
+    />
     <meta property="og:url" content="https://boardplay.dpdns.org/" />
     <meta property="og:image" content="https://boardplay.dpdns.org/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -17,18 +28,60 @@
     <meta property="og:locale" content="ko_KR" />
     <meta name="twitter:card" content="summary_large_image" />
 
+    <!-- 검색엔진용 구조화 데이터 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "보드플레이",
+        "url": "https://boardplay.dpdns.org/",
+        "inLanguage": "ko-KR",
+        "description": "티츄·스컬킹을 브라우저에서 무료로 즐기는 온라인 멀티플레이 보드게임."
+      }
+    </script>
+
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 폰트는 첫 페인트를 막지 않도록 비차단 로드 (LCP 개선). display=swap 이라 폰트 도착 전엔 시스템 폰트로 그려진다. -->
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Bakbak+One&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Bakbak+One&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap"
+      />
+    </noscript>
+
+    <!-- Google Search Console 인증: 아래 주석을 풀고 content 를 GSC 발급 코드로 교체하세요 -->
+    <!-- <meta name="google-site-verification" content="여기에_GSC_인증코드" /> -->
+
+    <!-- 방문자 통계 (GA4). 측정 ID는 /analytics.js 한 곳에서 관리 -->
+    <script src="/analytics.js" defer></script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width: 640px; margin: 40px auto; padding: 0 20px; font-family: system-ui, sans-serif; line-height: 1.7;">
+        <h1>티츄 · 스컬킹 온라인 — 무료 멀티플레이 보드게임</h1>
+        <p>
+          보드플레이는 설치 없이 브라우저에서 바로 즐기는 무료 온라인 보드게임입니다.
+          친구와 방을 만들어 티츄와 스컬킹을 플레이하세요. 게임을 하려면 자바스크립트를 켜야 합니다.
+        </p>
+        <p>먼저 규칙이 궁금하다면:</p>
+        <ul>
+          <li><a href="/guide/tichu/">티츄 규칙 보기</a></li>
+          <li><a href="/guide/skullking/">스컬킹 규칙 보기</a></li>
+          <li><a href="/guide/">전체 규칙 가이드</a></li>
+        </ul>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

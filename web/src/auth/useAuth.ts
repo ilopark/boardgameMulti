@@ -50,8 +50,14 @@ export function useAuth(): Auth {
     if (socket.connected) void refresh()
     const onConnect = () => void refresh()
     socket.on('connect', onConnect)
+    // 서버가 끝내 연결되지 않아도 첫 화면(로그인/게스트)은 보여준다.
+    // 이게 없으면 소켓이 한 번도 연결되지 않을 때 '불러오는 중…'에서 영영 멈춘다.
+    const failsafe = setTimeout(() => {
+      setState((s) => (s.loading ? { ...s, loading: false } : s))
+    }, 6000)
     return () => {
       socket.off('connect', onConnect)
+      clearTimeout(failsafe)
     }
   }, [refresh])
 

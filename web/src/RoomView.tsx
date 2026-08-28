@@ -78,6 +78,7 @@ export default function RoomView({ room, myId, onLeave, onError }: Props) {
             className="codebadge"
             onClick={() => void copyInvite()}
             title="초대 링크 복사"
+            aria-label={`방 코드 ${room.code}, 눌러서 초대 링크 복사`}
           >
             {room.code}
             <small>탭해서 초대 링크 복사</small>

@@ -97,7 +97,13 @@ export default function TichuCard({ card, size = 'md', selected, disabled, onCli
   const face = (
     <>
       {src ? (
-        <img className="tcard__img" src={src} alt="" draggable={false} />
+        <img
+          className="tcard__img"
+          src={src}
+          alt={tichuCardLabel(card)}
+          loading="lazy"
+          draggable={false}
+        />
       ) : (
         <span className="tcard__text">{tichuCardLabel(card)}</span>
       )}

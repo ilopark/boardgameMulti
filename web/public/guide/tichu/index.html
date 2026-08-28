@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>티츄(Tichu) 규칙 완벽 정리 — 조합 · 점수 계산 · 하는 법 | 보드플레이</title>
+    <meta
+      name="description"
+      content="티츄 규칙을 한글로 완벽 정리. 카드 구성, 카드 교환, 티츄·그랜드티츄 선언, 조합과 폭탄, 특수 카드(용·봉황·개·마작), 점수 계산까지 초보자용 하는 법 가이드."
+    />
+    <meta
+      name="keywords"
+      content="티츄 규칙, 티츄 하는법, 티츄 점수, 티츄 조합, 티츄 폭탄, 그랜드티츄, 용 봉황 개 마작, tichu rules"
+    />
+    <link rel="canonical" href="https://boardplay.dpdns.org/guide/tichu/" />
+    <meta name="theme-color" content="#f4f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="보드플레이" />
+    <meta property="og:title" content="티츄(Tichu) 규칙 완벽 정리 — 조합 · 점수 계산 · 하는 법" />
+    <meta property="og:description" content="카드 구성부터 점수 계산까지, 티츄 규칙을 한글로 쉽게 정리했습니다." />
+    <meta property="og:url" content="https://boardplay.dpdns.org/guide/tichu/" />
+    <meta property="og:image" content="https://boardplay.dpdns.org/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="stylesheet" href="/guide/guide.css" />
+    <script src="/analytics.js" defer></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://boardplay.dpdns.org/" },
+          { "@type": "ListItem", "position": 2, "name": "규칙 가이드", "item": "https://boardplay.dpdns.org/guide/" },
+          { "@type": "ListItem", "position": 3, "name": "티츄 규칙", "item": "https://boardplay.dpdns.org/guide/tichu/" }
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "티츄는 몇 명이서 하나요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "티츄는 4명이 2:2 팀으로 나뉘어 플레이합니다. 파트너는 서로 마주 보고 앉습니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "티츄와 그랜드 티츄의 차이는 무엇인가요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "그랜드 티츄는 처음 받은 8장만 보고 선언하며 성공 시 +200, 실패 시 -200입니다. 일반 티츄는 첫 카드를 내기 전 언제든 선언할 수 있고 성공 시 +100, 실패 시 -100입니다. 선언한 사람이 그 라운드에서 가장 먼저 카드를 모두 내면 성공입니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "티츄 폭탄은 무엇인가요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "폭탄은 같은 숫자 4장(포카드) 또는 같은 무늬 5장 이상의 연속(스트레이트 플러시)입니다. 폭탄은 다른 어떤 조합보다 세며, 자기 차례가 아니어도 끼어들어 낼 수 있습니다."
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">♠ 보드플레이</a>
+      <nav>
+        <a href="/guide/">규칙</a>
+        <a class="btn" href="/">지금 플레이</a>
+      </nav>
+    </header>
+
+    <main>
+      <nav class="breadcrumb" aria-label="위치">
+        <a href="/">홈</a> › <a href="/guide/">규칙 가이드</a> › 티츄
+      </nav>
+
+      <h1>티츄(Tichu) 규칙 완벽 정리</h1>
+      <p class="lede">
+        티츄는 4명이 2:2 팀으로 겨루는 트릭 테이킹 카드게임입니다. 파트너와 호흡을 맞춰
+        조합을 내고, 배짱 좋게 <strong>티츄</strong>를 선언해 점수를 불려 먼저 1000점에 닿는 팀이 이깁니다.
+      </p>
+
+      <nav class="toc" aria-label="목차">
+        <strong>목차</strong>
+        <ul>
+          <li><a href="#overview">게임 개요</a></li>
+          <li><a href="#cards">카드 구성</a></li>
+          <li><a href="#setup">게임 준비와 카드 교환</a></li>
+          <li><a href="#declare">티츄 선언</a></li>
+          <li><a href="#combos">카드 조합</a></li>
+          <li><a href="#special">특수 카드</a></li>
+          <li><a href="#trick">트릭 진행</a></li>
+          <li><a href="#score">점수 계산</a></li>
+          <li><a href="#faq">자주 묻는 질문</a></li>
+        </ul>
+      </nav>
+
+      <h2 id="overview">게임 개요</h2>
+      <ul>
+        <li><strong>인원:</strong> 정확히 4명 (2:2 팀, 파트너는 마주 앉음)</li>
+        <li><strong>목표:</strong> 먼저 <strong>1000점</strong>(합의한 목표 점수)에 도달</li>
+        <li><strong>핵심:</strong> 파트너와 협력해 카드를 먼저 털고, 티츄 선언으로 보너스 획득</li>
+      </ul>
+
+      <h2 id="cards">카드 구성</h2>
+      <p>티츄는 <strong>총 56장</strong>으로 플레이합니다. 일반 카드 52장과 특수 카드 4장입니다.</p>
+      <ul>
+        <li><strong>일반 카드 52장:</strong> 4가지 무늬(옥·검·탑·별) × 2~14(A). 무늬는 세기에 영향을 주지 않고 숫자만 봅니다.</li>
+        <li><strong>특수 카드 4장:</strong> 마작(1) · 개 · 봉황 · 용</li>
+      </ul>
+
+      <h2 id="setup">게임 준비와 카드 교환</h2>
+      <ol>
+        <li>카드를 잘 섞어 각자 <strong>14장</strong>씩 나눠 갖습니다.</li>
+        <li>
+          먼저 <strong>8장</strong>을 받고, 이때 자신 있으면 <strong>그랜드 티츄</strong>를 선언할 수 있습니다.
+          이후 나머지 6장을 받습니다.
+        </li>
+        <li>
+          <strong>카드 교환:</strong> 손패 14장을 다 본 뒤, 왼쪽·파트너·오른쪽 세 사람에게
+          각각 원하는 카드 <strong>1장씩</strong>을 동시에 건넵니다. 좋은 카드는 파트너에게, 필요 없는 카드는 상대에게 넘기는 것이 요령입니다.
+        </li>
+        <li><strong>마작(1)</strong>을 가진 사람이 첫 트릭을 시작(리드)합니다.</li>
+      </ol>
+
+      <h2 id="declare">티츄 선언</h2>
+      <p>티츄 선언은 "이번 라운드에서 우리 편 중 내가 가장 먼저 카드를 다 내겠다"는 배팅입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>선언</th><th>선언 시점</th><th>성공</th><th>실패</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>그랜드 티츄</td><td>처음 8장만 본 상태에서</td><td>+200</td><td>−200</td></tr>
+            <tr><td>티츄</td><td>자신의 첫 카드를 내기 전 언제든</td><td>+100</td><td>−100</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        선언한 사람이 그 라운드에서 <strong>가장 먼저</strong> 손패를 모두 비우면 성공입니다.
+        한 명이라도 먼저 끝내면 실패이므로, 파트너의 견제도 중요합니다.
+      </div>
+
+      <h2 id="combos">카드 조합</h2>
+      <p>내 차례에는 앞사람이 낸 것과 <strong>같은 종류</strong>이면서 <strong>더 센</strong> 조합을 내거나, 패스합니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>조합</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>싱글</td><td>낱장 1장</td></tr>
+            <tr><td>페어</td><td>같은 숫자 2장</td></tr>
+            <tr><td>트리플</td><td>같은 숫자 3장</td></tr>
+            <tr><td>풀하우스</td><td>트리플 + 페어 (세기는 트리플 숫자로 비교)</td></tr>
+            <tr><td>스트레이트</td><td>연속된 숫자 5장 이상 (무늬 무관)</td></tr>
+            <tr><td>연속 페어(계단)</td><td>연속된 숫자의 페어 2쌍 이상 (예: 5·5·6·6)</td></tr>
+            <tr><td>폭탄</td><td>같은 숫자 4장, 또는 같은 무늬 5장 이상 연속 (가장 셈)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>폭탄</strong>은 어떤 조합보다 세고, <strong>자기 차례가 아니어도</strong> 끼어들어 낼 수 있습니다.
+        같은 무늬 스트레이트 플러시 폭탄은 포카드 폭탄보다 셉니다.
+      </div>
+
+      <h2 id="special">특수 카드</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>카드</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td>마작 (1)</td><td>가장 낮은 숫자 1. 낼 때 <strong>소원</strong>으로 특정 숫자를 지정할 수 있고, 그 숫자를 낼 수 있는 다음 사람은 반드시 내야 합니다.</td></tr>
+            <tr><td>개</td><td>리드(첫 장)로만 사용. 트릭을 즉시 넘겨 <strong>파트너에게 리드권</strong>을 줍니다.</td></tr>
+            <tr><td>봉황</td><td>조커. 싱글로 낼 때 앞 카드보다 0.5 높은 값이 됩니다(용은 못 이김). 조합에 대신 끼울 수 있으나 폭탄에는 불가. 라운드 종료 시 <strong>−25점</strong>.</td></tr>
+            <tr><td>용</td><td>가장 센 싱글. <strong>+25점</strong>. 단, 용으로 트릭을 이기면 그 트릭 전체를 <strong>상대 팀</strong>에게 줘야 합니다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="trick">트릭 진행</h2>
+      <ol>
+        <li>리드한 사람이 조합을 내면, 시계 방향으로 더 센 같은 종류를 내거나 패스합니다.</li>
+        <li>모두가 패스하면 마지막에 가장 센 카드를 낸 사람이 그 트릭의 카드를 가져오고, 다음 트릭을 리드합니다.</li>
+        <li>손패를 다 낸 사람은 그 라운드를 끝냅니다. 남은 사람들끼리 계속 진행합니다.</li>
+      </ol>
+
+      <h2 id="score">점수 계산</h2>
+      <p>카드마다 점수가 있으며, 한 라운드의 카드 점수 합은 <strong>100점</strong>입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>카드</th><th>점수</th></tr></thead>
+          <tbody>
+            <tr><td>K(13), 10</td><td>각 10점</td></tr>
+            <tr><td>5</td><td>5점</td></tr>
+            <tr><td>용</td><td>+25점</td></tr>
+            <tr><td>봉황</td><td>−25점</td></tr>
+            <tr><td>그 외 카드</td><td>0점</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>원-투 피니시 (200점)</h3>
+      <p>
+        한 팀의 <strong>두 사람이 1등과 2등</strong>으로 먼저 끝내면, 그 라운드는 즉시 종료되고
+        그 팀이 <strong>200점</strong>을 가져갑니다(카드 점수는 계산하지 않음).
+      </p>
+      <h3>일반 종료</h3>
+      <ul>
+        <li>마지막까지 남은 사람의 <strong>손패</strong>는 <strong>상대 팀</strong>이 가져갑니다.</li>
+        <li>마지막 사람이 <strong>따 놓은 트릭</strong>은 <strong>1등</strong>에게 넘어갑니다.</li>
+        <li>여기에 티츄·그랜드 티츄 성공/실패 보너스를 ± 합니다.</li>
+      </ul>
+
+      <h2 id="faq">자주 묻는 질문</h2>
+      <details>
+        <summary>티츄는 몇 명이서 하나요?</summary>
+        <p>정확히 4명이 필요합니다. 2:2 팀으로 나뉘고 파트너는 마주 보고 앉습니다. 사람이 부족하면 보드플레이에서 봇을 추가해 연습할 수 있습니다.</p>
+      </details>
+      <details>
+        <summary>티츄와 그랜드 티츄의 차이는?</summary>
+        <p>그랜드 티츄는 처음 8장만 보고 선언하며 ±200점, 일반 티츄는 첫 카드를 내기 전 언제든 선언하며 ±100점입니다. 선언한 사람이 라운드에서 가장 먼저 손패를 비우면 성공입니다.</p>
+      </details>
+      <details>
+        <summary>폭탄은 언제 낼 수 있나요?</summary>
+        <p>폭탄(같은 숫자 4장 또는 같은 무늬 5장 이상 연속)은 자기 차례가 아니어도 끼어들어 낼 수 있고, 다른 모든 조합을 이깁니다.</p>
+      </details>
+      <details>
+        <summary>봉황과 용은 어떻게 쓰나요?</summary>
+        <p>봉황은 조커로 싱글에서 앞 카드보다 0.5 높게 작동하고 종료 시 −25점입니다. 용은 가장 센 싱글이고 +25점이지만, 용으로 트릭을 이기면 그 트릭을 상대 팀에 줘야 합니다.</p>
+      </details>
+
+      <p class="callout">
+        더 잘하고 싶다면 → <a href="/guide/tichu/strategy/">티츄 전략과 팁</a>
+      </p>
+
+      <div class="cta">
+        <h2>규칙을 익혔다면 실전!</h2>
+        <p>친구를 초대하거나 봇과 함께. 설치 없이 브라우저에서 바로 티츄를 즐기세요.</p>
+        <a class="btn btn--lg" href="/">티츄 무료로 플레이하기</a>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/guide/">← 규칙 가이드</a> · <a href="/guide/tichu/strategy/">티츄 전략</a> ·
+        <a href="/guide/skullking/">스컬킹 규칙</a> · <a href="/about/">소개</a> ·
+        <a href="/contact/">문의</a> · <a href="/privacy/">개인정보처리방침</a>
+      </p>
+      <p>티츄(Tichu)는 저작권자의 상표입니다. 본 사이트는 팬이 만든 비공식 온라인 플레이 도구입니다.</p>
+    </footer>
+  </body>
+</html>

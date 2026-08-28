@@ -46,6 +46,10 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
     password.length >= 8 &&
     (mode === 'login' || nickname.trim().length >= 1)
 
+  // 모바일에서 autoFocus 는 키보드를 강제로 띄워 레이아웃을 밀어올린다 → 정밀 포인터(데스크톱)만.
+  const canAutoFocus =
+    typeof window !== 'undefined' && (window.matchMedia?.('(pointer: fine)').matches ?? false)
+
   // ── 게스트 닉네임 입력 단계 ──
   if (guestNaming) {
     const ok = guestName.trim().length >= 1
@@ -78,7 +82,7 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
                 maxLength={12}
                 placeholder="1~12자 (한글 가능)"
                 autoComplete="off"
-                autoFocus
+                autoFocus={canAutoFocus}
               />
             </label>
             <button type="submit" className="primary" disabled={!ok}>

@@ -77,6 +77,7 @@ export default function LobbyHome({
 
   return (
     <div className="lobbyhome">
+      <h1 className="visually-hidden">보드게임 로비 — 티츄 · 스컬킹</h1>
       <div className="lobbyhome__head">
         <div className="lobbyhome__me">
           {user ? (

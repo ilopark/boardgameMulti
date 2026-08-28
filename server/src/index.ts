@@ -81,6 +81,20 @@ const serveWeb = existsSync(webDist)
       brotli: true,
       maxAge: 3600,
       /**
+       * 파일 종류별 캐시 정책.
+       *  - HTML: 항상 재검증(no-cache) → 새로 배포하면 사용자가 바로 최신을 받는다.
+       *  - Vite 해시 자산(/assets/…): 내용이 바뀌면 파일명이 바뀌므로 1년 불변 캐시로 두어
+       *    재방문 성능을 살린다.
+       * 그 외(공용 이미지·규칙 페이지 CSS 등)는 위 maxAge(1시간)를 그대로 쓴다.
+       */
+      setHeaders(res, pathname) {
+        if (pathname === '/' || pathname.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache')
+        } else if (pathname.includes('/assets/')) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        }
+      },
+      /**
        * 요청마다 파일 시스템을 다시 확인한다.
        *
        * 이게 없으면 sirv가 **서버 시작 시점의 파일 목록을 캐시**한다.

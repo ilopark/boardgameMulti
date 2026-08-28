@@ -149,7 +149,13 @@ export default function Card({ card, tigressAs, size = 'md', disabled, playable,
     <>
       <span className="pcard__art">
         {useImage ? (
-          <img className="pcard__img" src={imgSrc} alt="" draggable={false} />
+          <img
+            className="pcard__img"
+            src={imgSrc}
+            alt={cardLabel(card)}
+            loading="lazy"
+            draggable={false}
+          />
         ) : isNumber ? (
           suitArt(card.color, 'pcard__svg')
         ) : (

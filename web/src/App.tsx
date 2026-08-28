@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { GAME_LABEL, type ChatMessage, type GameId, type RoomPublic, type skullking, type tichu } from '@bg/core'
 import { clearIdentity, loadIdentity, loadNickname, request, saveIdentity, saveNickname, socket } from './socket.js'
 import { applyTheme, loadTheme, type Theme } from './theme.js'
@@ -8,9 +8,12 @@ import Chat from './Chat.js'
 import LobbyHome from './LobbyHome.js'
 import type { RoomVisibility } from '@bg/core'
 import RoomView from './RoomView.js'
-import GameView from './game/GameView.js'
-import TichuGameView from './game/TichuGameView.js'
-import CardGallery from './game/CardGallery.js'
+
+// 게임 화면·갤러리는 초기 로딩엔 필요 없다 → 필요할 때 따로 불러온다(코드 스플릿).
+// 로비/로그인 첫 진입 번들에서 큰 게임 UI와 관련 코드를 빼서 초기 로딩을 가볍게 한다.
+const GameView = lazy(() => import('./game/GameView.js'))
+const TichuGameView = lazy(() => import('./game/TichuGameView.js'))
+const CardGallery = lazy(() => import('./game/CardGallery.js'))
 
 type SkView = skullking.SkPlayerView
 
@@ -185,12 +188,12 @@ export default function App() {
     setEnteredAsGuest(false) // 로그인 화면으로 돌아간다
   }, [auth])
 
-  // 로그인했거나 게스트로 시작을 눌렀으면 로비로 들어간다
+  // 로그인했거나 게스트로 "시작하기"를 눌렀으면 로비로 들어간다.
   // auth.loading 중에는 로비로 치지 않는다.
-  // 초기값 enabled=false 때문에 '!auth.enabled' 가 잠깐 참이 되어 inLobby 가 깜빡 true 가 되면,
-  // 게스트가 이름을 입력하기도 전에 아래 자동 입장이 이전 닉네임으로 실행돼 pendingCode 를
-  // 소거해 버린다 → 정작 게스트 이름을 넣으면 입장이 안 되는 버그.
-  const inLobby = !auth.loading && (auth.user !== null || enteredAsGuest || !auth.enabled)
+  // 계정 기능이 꺼진(DB 없는) 서버라도 여기서 바로 로비로 보내지 않는다.
+  // → 그러면 LobbyHome 에는 게스트 이름 입력칸이 없어 방 만들기·입장이 영영 비활성이 된다.
+  //   대신 AuthPanel 의 게스트 이름 입력('시작하기')을 거쳐 enteredAsGuest 가 켜지면 들어온다.
+  const inLobby = !auth.loading && (auth.user !== null || enteredAsGuest)
 
   // 초대 링크로 들어왔으면, 로비에 들어서는 순간 그 방으로 자동 입장한다.
   // (미로그인이면 먼저 로그인/게스트를 거치고, 그게 끝나면 여기로 흘러온다)
@@ -236,24 +239,32 @@ export default function App() {
 
   return (
     <div className={immersive ? 'app app--immersive' : inGame ? 'app app--playing' : 'app'}>
+      <a className="skip-link" href="#main">본문으로 건너뛰기</a>
       <header className="topbar">
         <span className="brand">보드게임</span>
         <span className="topbar__right">
-          <span className={connected ? 'status status--on' : 'status status--off'}>
+          <a className="topbar__link" href="/guide/">📖 게임 방법</a>
+          <span
+            className={connected ? 'status status--on' : 'status status--off'}
+            role="status"
+            aria-live="polite"
+          >
             {connected ? '연결됨' : '연결 끊김'}
           </span>
           <button
             type="button"
             className="themebtn"
             title={theme === 'dark' ? '라이트 모드로' : '다크 모드로'}
+            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
           </button>
         </span>
       </header>
 
-      <main className="main">
+      <main className="main" id="main">
+        <Suspense fallback={<div className="bootwait muted">불러오는 중…</div>}>
         {IS_GALLERY && <CardGallery />}
         {IS_GALLERY ? null : room && myId && game && room.phase !== 'lobby' ? (
           room.game === 'tichu' ? (
@@ -302,10 +313,20 @@ export default function App() {
             onError={notify}
           />
         )}
+        </Suspense>
       </main>
 
       <footer className="footer">
-        {room ? `${GAME_LABEL[room.game]} · 방코드 ${room.code}` : '친구랑 하는 티츄 / 스컬킹'}
+        {room ? (
+          `${GAME_LABEL[room.game]} · 방코드 ${room.code}`
+        ) : (
+          <>
+            친구랑 하는 티츄 / 스컬킹 ·{' '}
+            <a className="footer__link" href="/guide/">게임 방법</a> ·{' '}
+            <a className="footer__link" href="/about/">소개</a> ·{' '}
+            <a className="footer__link" href="/privacy/">개인정보처리방침</a>
+          </>
+        )}
       </footer>
 
       {room && myId && !IS_GALLERY && (
@@ -316,7 +337,11 @@ export default function App() {
         />
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="toast" role="status" aria-live="assertive">
+          {toast}
+        </div>
+      )}
 
       {announce && (
         <div className={`announce announce--${announce.kind}`} role="status">

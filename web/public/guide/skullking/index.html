@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>스컬킹(Skull King) 규칙 정리 — 입찰 · 점수 계산 · 하는 법 | 보드플레이</title>
+    <meta
+      name="description"
+      content="스컬킹 규칙을 한글로 정리했습니다. 카드 구성과 서열, 입찰(비드) 방식, 특수 카드(해적·인어·스컬킹·티그리스), 점수와 보너스 계산까지 초보자용 하는 법 가이드."
+    />
+    <meta
+      name="keywords"
+      content="스컬킹 규칙, 스컬킹 하는법, 스컬킹 점수, 스컬킹 입찰, 해적 인어 스컬킹, skull king rules"
+    />
+    <link rel="canonical" href="https://boardplay.dpdns.org/guide/skullking/" />
+    <meta name="theme-color" content="#f4f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="보드플레이" />
+    <meta property="og:title" content="스컬킹(Skull King) 규칙 정리 — 입찰 · 점수 계산 · 하는 법" />
+    <meta property="og:description" content="카드 서열부터 보너스 점수까지, 스컬킹 규칙을 한글로 쉽게 정리했습니다." />
+    <meta property="og:url" content="https://boardplay.dpdns.org/guide/skullking/" />
+    <meta property="og:image" content="https://boardplay.dpdns.org/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="stylesheet" href="/guide/guide.css" />
+    <script src="/analytics.js" defer></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://boardplay.dpdns.org/" },
+          { "@type": "ListItem", "position": 2, "name": "규칙 가이드", "item": "https://boardplay.dpdns.org/guide/" },
+          { "@type": "ListItem", "position": 3, "name": "스컬킹 규칙", "item": "https://boardplay.dpdns.org/guide/skullking/" }
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "스컬킹은 몇 명이서 하나요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "스컬킹은 2명부터 8명까지 즐길 수 있으며, 보통 4~6명일 때 가장 재미있습니다. 총 10라운드를 진행합니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "스컬킹에서 입찰(비드)은 어떻게 하나요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "매 라운드 카드를 받은 뒤, 자신이 그 라운드에서 이길 트릭 수를 0부터 라운드 번호까지 중에 정해 동시에 공개합니다. 실제로 딴 트릭 수가 입찰과 정확히 같아야 점수를 크게 얻습니다."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "스컬킹 카드 서열은 어떻게 되나요?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "스컬킹은 해적을 이기고, 해적은 인어를 이기고, 인어는 스컬킹을 이깁니다. 세 종류가 한 트릭에 모두 나오면 인어가 이깁니다. 특수 카드는 모든 숫자 카드보다 세며, 검정(졸리로저)은 다른 색 숫자를 이깁니다. 도주는 항상 집니다."
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">♠ 보드플레이</a>
+      <nav>
+        <a href="/guide/">규칙</a>
+        <a class="btn" href="/">지금 플레이</a>
+      </nav>
+    </header>
+
+    <main>
+      <nav class="breadcrumb" aria-label="위치">
+        <a href="/">홈</a> › <a href="/guide/">규칙 가이드</a> › 스컬킹
+      </nav>
+
+      <h1>스컬킹(Skull King) 규칙 정리</h1>
+      <p class="lede">
+        스컬킹은 매 라운드 <strong>자신이 이길 트릭 수를 미리 입찰</strong>하는 해적 카드게임입니다.
+        많이 딴다고 좋은 게 아니라, <strong>정확히 맞히는</strong> 사람이 이깁니다. 총 10라운드 합계로 승부합니다.
+      </p>
+
+      <nav class="toc" aria-label="목차">
+        <strong>목차</strong>
+        <ul>
+          <li><a href="#overview">게임 개요</a></li>
+          <li><a href="#cards">카드 구성</a></li>
+          <li><a href="#rank">카드 서열</a></li>
+          <li><a href="#flow">라운드 진행</a></li>
+          <li><a href="#bid">입찰(비드)</a></li>
+          <li><a href="#special">특수 카드</a></li>
+          <li><a href="#score">점수 계산</a></li>
+          <li><a href="#bonus">보너스 점수</a></li>
+          <li><a href="#faq">자주 묻는 질문</a></li>
+        </ul>
+      </nav>
+
+      <h2 id="overview">게임 개요</h2>
+      <ul>
+        <li><strong>인원:</strong> 2~8명 (4~6명 권장)</li>
+        <li><strong>라운드:</strong> 총 10라운드. N라운드에는 각자 <strong>N장</strong>을 받습니다(1라운드 1장 … 10라운드 10장).</li>
+        <li><strong>목표:</strong> 매 라운드 입찰을 정확히 맞혀 점수를 쌓고, 10라운드 합계 최고점이 승리</li>
+      </ul>
+
+      <h2 id="cards">카드 구성</h2>
+      <ul>
+        <li>
+          <strong>숫자 카드 4색 (1~14):</strong>
+          앵무새(초록) · 보물상자(노랑) · 지도(보라) · 졸리로저(검정). 검정은 <strong>으뜸패(트럼프)</strong>로 다른 색을 이깁니다.
+        </li>
+        <li>
+          <strong>특수 카드:</strong> 도주 · 해적 · 인어 · 스컬킹 · 티그리스 (에디션에 따라 크라켄·흰고래 등 추가)
+        </li>
+      </ul>
+
+      <h2 id="rank">카드 서열</h2>
+      <p>같은 트릭 안에서 누가 이기는지는 다음 순서로 정해집니다.</p>
+      <ul>
+        <li><strong>도주(백기):</strong> 항상 짐. 일부러 트릭을 지고 싶을 때 냅니다.</li>
+        <li><strong>숫자 카드:</strong> 처음 나온 색을 따라야 하며, 같은 색은 숫자가 클수록 셉니다. 검정은 다른 색 숫자를 모두 이깁니다.</li>
+        <li><strong>특수 서열(가위바위보):</strong> 스컬킹 &gt; 해적 &gt; 인어 &gt; 스컬킹 … 순환합니다.</li>
+      </ul>
+      <div class="callout">
+        핵심 순환: <strong>스컬킹은 해적</strong>을, <strong>해적은 인어</strong>를, <strong>인어는 스컬킹</strong>을 이깁니다.
+        세 종류가 한 트릭에 모두 나오면 <strong>인어</strong>가 가져갑니다. 특수 카드는 모든 숫자 카드보다 셉니다.
+      </div>
+
+      <h2 id="flow">라운드 진행</h2>
+      <ol>
+        <li>그 라운드의 장수만큼 카드를 나눠 갖습니다.</li>
+        <li>모두가 이길 트릭 수를 <strong>동시에 입찰</strong>합니다.</li>
+        <li>
+          리드한 사람이 카드를 내면, 나머지는 <strong>처음 나온 색을 따라</strong> 냅니다(그 색이 없으면 아무 카드나 가능).
+          특수 카드는 언제든 낼 수 있습니다.
+        </li>
+        <li>가장 센 카드를 낸 사람이 그 트릭을 가져오고 다음 트릭을 리드합니다.</li>
+        <li>모든 카드를 다 내면 라운드가 끝나고 점수를 계산합니다.</li>
+      </ol>
+
+      <h2 id="bid">입찰(비드)</h2>
+      <p>
+        입찰은 "이번 라운드에 트릭을 <strong>몇 번 이기겠다</strong>"를 미리 거는 것입니다.
+        0부터 그 라운드 장수까지 고를 수 있습니다. 실제로 딴 수가 입찰과 <strong>정확히 같아야</strong> 큰 점수를 얻고,
+        빗나가면 감점입니다. 그래서 일부러 지려고 <strong>도주</strong>를 내기도 합니다.
+      </p>
+
+      <h2 id="special">특수 카드</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>카드</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td>도주</td><td>항상 짐. 트릭을 일부러 지고 싶을 때.</td></tr>
+            <tr><td>해적</td><td>모든 숫자 카드와 인어를 이김. 스컬킹에게는 짐.</td></tr>
+            <tr><td>인어</td><td>모든 숫자 카드를 이김. 해적에게는 지지만 <strong>스컬킹은 이김</strong>.</td></tr>
+            <tr><td>스컬킹</td><td>모든 숫자 카드와 해적을 이김. 단 <strong>인어에게 짐</strong>.</td></tr>
+            <tr><td>티그리스</td><td>낼 때 <strong>해적처럼</strong> 쓸지 <strong>도주처럼</strong> 쓸지 선택.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="score">점수 계산</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>상황</th><th>점수</th></tr></thead>
+          <tbody>
+            <tr><td>입찰 &gt; 0, 정확히 맞힘</td><td>입찰 수 × <strong>20점</strong> (+보너스)</td></tr>
+            <tr><td>입찰 &gt; 0, 빗나감</td><td>빗나간 트릭 1개당 <strong>−10점</strong></td></tr>
+            <tr><td>입찰 = 0, 성공(한 번도 안 이김)</td><td>라운드 번호 × <strong>10점</strong></td></tr>
+            <tr><td>입찰 = 0, 실패</td><td>라운드 번호 × <strong>−10점</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        예) 5라운드에서 2개를 입찰해 정확히 2개를 따면 <strong>40점</strong>. 0을 입찰해 성공하면 <strong>50점</strong>,
+        실패하면 <strong>−50점</strong>입니다.
+      </div>
+
+      <h2 id="bonus">보너스 점수</h2>
+      <p>보너스는 <strong>입찰을 정확히 맞힌 경우에만</strong> 더해집니다.</p>
+      <ul>
+        <li>내가 이긴 트릭에 포함된 <strong>색깔 14</strong>: 각 <strong>+10점</strong></li>
+        <li><strong>검정(졸리로저) 14</strong>: <strong>+20점</strong></li>
+        <li><strong>인어로 스컬킹을 잡으면</strong>: <strong>+50점</strong></li>
+        <li><strong>스컬킹으로 해적을 잡을 때마다</strong>: 각 <strong>+30점</strong></li>
+      </ul>
+
+      <h2 id="faq">자주 묻는 질문</h2>
+      <details>
+        <summary>스컬킹은 몇 명이서 하나요?</summary>
+        <p>2~8명까지 가능하며 4~6명일 때 가장 재미있습니다. 총 10라운드를 진행합니다. 보드플레이에서는 사람이 부족하면 봇을 추가할 수 있습니다.</p>
+      </details>
+      <details>
+        <summary>입찰은 왜 정확히 맞혀야 하나요?</summary>
+        <p>많이 이기는 게 목표가 아니라 예측력이 목표이기 때문입니다. 정확히 맞히면 입찰 수 × 20점을 얻지만, 하나라도 빗나가면 빗나간 만큼 감점됩니다.</p>
+      </details>
+      <details>
+        <summary>스컬킹, 해적, 인어 중 뭐가 제일 세나요?</summary>
+        <p>고정된 최강은 없습니다. 스컬킹은 해적을, 해적은 인어를, 인어는 스컬킹을 이기는 순환 구조입니다. 세 장이 한 트릭에 모두 나오면 인어가 이깁니다.</p>
+      </details>
+      <details>
+        <summary>일부러 지려면 어떻게 하나요?</summary>
+        <p>도주 카드를 내면 그 트릭에서 항상 집니다. 0을 입찰했거나 더 이상 이기면 안 될 때 유용합니다. 티그리스도 도주처럼 쓸 수 있습니다.</p>
+      </details>
+
+      <p class="callout">
+        더 잘하고 싶다면 → <a href="/guide/skullking/strategy/">스컬킹 전략과 팁</a>
+      </p>
+
+      <div class="cta">
+        <h2>규칙을 익혔다면 실전!</h2>
+        <p>친구를 초대하거나 봇과 함께. 설치 없이 브라우저에서 바로 스컬킹을 즐기세요.</p>
+        <a class="btn btn--lg" href="/">스컬킹 무료로 플레이하기</a>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/guide/">← 규칙 가이드</a> · <a href="/guide/skullking/strategy/">스컬킹 전략</a> ·
+        <a href="/guide/tichu/">티츄 규칙</a> · <a href="/about/">소개</a> ·
+        <a href="/contact/">문의</a> · <a href="/privacy/">개인정보처리방침</a>
+      </p>
+      <p>스컬킹(Skull King)은 저작권자의 상표입니다. 본 사이트는 팬이 만든 비공식 온라인 플레이 도구입니다.</p>
+    </footer>
+  </body>
+</html>
