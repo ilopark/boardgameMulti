@@ -241,7 +241,7 @@ export default function App() {
     <div className={immersive ? 'app app--immersive' : inGame ? 'app app--playing' : 'app'}>
       <a className="skip-link" href="#main">본문으로 건너뛰기</a>
       <header className="topbar">
-        <span className="brand">보드게임</span>
+        <span className="brand"><span aria-hidden="true">♠</span> 보드플레이</span>
         <span className="topbar__right">
           <a className="topbar__link" href="/guide/">📖 게임 방법</a>
           <span
