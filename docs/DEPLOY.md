@@ -1,5 +1,46 @@
 # 배포
 
+## 현재 운영 배포 — Oracle Cloud (자체 서버)
+
+지금 실제 서비스는 Oracle Cloud 무료티어 서버에서 돌아간다.
+
+| 항목 | 값 |
+|---|---|
+| 서버 | `ubuntu@161.33.213.129` |
+| SSH 키 | `~/.ssh/id_ed25519` (이 경로에 **실제 키 파일이 있어야** 함) |
+| 도메인 | `boardplay.dpdns.org` (dpdns.org 무료 서브도메인) |
+| 서버 포트 | `3001` (프론트 정적파일까지 같은 서버가 서빙) |
+
+### 한 번에 배포
+
+```bash
+npm run deploy      # = bash tools/deploy.sh
+```
+
+이게 하는 일:
+1. `git push origin main` — GitHub에 푸시
+2. `ssh -i ~/.ssh/id_ed25519 ubuntu@161.33.213.129 'bash ~/deploy.sh'`
+   — 서버에서 git pull + 빌드 + 재시작
+
+### 수동으로 서버만 배포 (푸시는 이미 됐을 때)
+
+```bash
+ssh -i ~/.ssh/id_ed25519 ubuntu@161.33.213.129 'bash ~/deploy.sh'
+```
+
+> `ssh -i ~/.ssh/id_ed25519 ubuntu@161.33.213.129` 만 치면 **로그인만** 된다.
+> 배포하려면 접속 후 `bash ~/deploy.sh` 를 돌리거나 위처럼 한 줄로 실행한다.
+
+### 주의
+
+- **키 파일이 없으면** `Identity file ... not accessible` / `Host key verification failed` 로 실패한다.
+  새 PC에서 배포하려면 배포용 개인키를 `~/.ssh/id_ed25519` 에 두고,
+  처음 접속 시 호스트 키를 한 번 승인(`yes`)해야 한다.
+- **게임 중 배포 금지** — 방 상태가 메모리에만 있어 재시작하면 진행 중이던 방이 사라진다.
+- 배포 후 `https://boardplay.dpdns.org/health` 로 정상 기동 확인.
+
+---
+
 ## 왜 GitHub Pages로는 안 되나
 
 이 게임은 **실시간 멀티플레이**라 항상 떠 있는 서버가 필요하다.
