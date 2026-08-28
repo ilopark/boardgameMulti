@@ -221,7 +221,6 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
           <button type="button" className="ghost authpanel__guest" onClick={() => setGuestNaming(true)}>
             게스트로 시작
           </button>
-          <p className="authhint muted">게스트는 전적이 쌓이지 않아요.</p>
         </section>
       )}
     </div>
