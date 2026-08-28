@@ -41,6 +41,24 @@ export default function LobbyHome({
   const [showCreate, setShowCreate] = useState(false)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  // 로그인 사용자의 전적 (게스트는 안 뜬다). 로비로 돌아올 때마다 새로 불러온다.
+  const [record, setRecord] = useState<{ games: number; wins: number } | null>(null)
+
+  useEffect(() => {
+    if (!user) {
+      setRecord(null)
+      return
+    }
+    let alive = true
+    request('stats:me', {})
+      .then((r) => {
+        if (alive) setRecord(r)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [user])
 
   const loadRooms = useCallback(async () => {
     try {
@@ -85,6 +103,11 @@ export default function LobbyHome({
             <>
               <span className="lobbyhome__nick">{user.nickname}</span>
               <span className="lobbyhome__tag">#{user.tag}</span>
+              {record && record.games > 0 && (
+                <span className="lobbyhome__rec">
+                  {record.games}판 · {record.wins}승
+                </span>
+              )}
               <button type="button" className="linkbtn" onClick={onLogout}>
                 로그아웃
               </button>

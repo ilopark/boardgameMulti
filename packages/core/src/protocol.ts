@@ -213,6 +213,13 @@ export interface ClientToServer {
   'posts:delete': (p: { id: number }, cb: (r: Ack<null>) => void) => void
   /** 관리자 답변 (관리자만) */
   'posts:reply': (p: { id: number; reply: string }, cb: (r: Ack<null>) => void) => void
+
+  // ── 전적 ──
+  /** 내 전적 요약(로그인한 사람만). 게스트는 null. */
+  'stats:me': (
+    p: Record<string, never>,
+    cb: (r: Ack<{ games: number; wins: number } | null>) => void,
+  ) => void
 }
 
 /** 서버 → 클라이언트 */

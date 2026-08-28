@@ -26,6 +26,7 @@ import {
 } from '@bg/core'
 import { setupAuth, type Accounts, type Account } from './auth/index.js'
 import { createPost, deletePost, isAdmin, listPosts, PostError, replyPost, updatePost } from './posts.js'
+import { getUserRecord, recordGame } from './stats.js'
 import { AuthError } from './auth/types.js'
 import { RateLimiter, clientIp } from './ratelimit.js'
 import { createRoomStore, toSummary, type RoomStore } from './store/index.js'
@@ -516,12 +517,14 @@ function advance(room: Room): void {
     if (next.phase === 'gameEnd') {
       room.phase = 'finished'
       broadcast(room)
+      void recordGame(room).catch((e) => console.error('[전적 기록 실패]', e))
     }
   } else if (room.tichuGame) {
     room.tichuGame = tichu.reduce(room.tichuGame, { type: 'advance' }, room.rng)
     if (room.tichuGame.phase === 'gameEnd') {
       room.phase = 'finished'
       broadcast(room)
+      void recordGame(room).catch((e) => console.error('[전적 기록 실패]', e))
     }
   }
   afterGameChange(room)
@@ -787,6 +790,14 @@ io.on('connection', (socket) => {
     void replyPost(account, id, reply)
       .then(() => cb({ ok: true }))
       .catch(postFail(cb))
+  })
+
+  socket.on('stats:me', (_p, cb) => {
+    const account = socket.data.account
+    if (!account) return cb({ ok: true, data: null }) // 게스트는 전적 없음
+    void getUserRecord(account.id)
+      .then((rec) => cb({ ok: true, data: rec }))
+      .catch(() => cb({ ok: true, data: null }))
   })
 
   // ── 로비 ────────────────────────────────────────────────────
