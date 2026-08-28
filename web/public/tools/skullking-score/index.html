@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>스컬킹 점수 계산기 — 입찰·보너스 자동 계산 | 보드플레이</title>
+    <meta
+      name="description"
+      content="스컬킹 점수를 자동으로 계산해주는 무료 계산기. 라운드별 입찰·획득 트릭·보너스를 넣으면 정확한 점수와 누적 순위를 바로 보여줍니다."
+    />
+    <meta name="keywords" content="스컬킹 점수 계산기, 스컬킹 점수, 스컬킹 계산기, 스컬킹 입찰 점수, skull king score" />
+    <link rel="canonical" href="https://boardplay.dpdns.org/tools/skullking-score/" />
+    <meta name="theme-color" content="#f4f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="보드플레이" />
+    <meta property="og:title" content="스컬킹 점수 계산기" />
+    <meta property="og:description" content="입찰·보너스를 넣으면 스컬킹 점수를 자동 계산." />
+    <meta property="og:url" content="https://boardplay.dpdns.org/tools/skullking-score/" />
+    <meta property="og:image" content="https://boardplay.dpdns.org/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="stylesheet" href="/guide/guide.css" />
+    <script src="/analytics.js" defer></script>
+    <style>
+      .calc-setup { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 16px 0; }
+      .calc-field { display: flex; flex-direction: column; gap: 4px; }
+      .calc-field label { font-size: 13px; color: var(--muted); }
+      .calc input[type='number'], .calc input[type='text'], .calc select {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+        padding: 9px 11px; color: var(--text); font: inherit; font-size: 15px; width: 100%;
+      }
+      .calc input:focus, .calc select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .players { display: grid; gap: 10px; margin: 16px 0; }
+      .prow {
+        display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr 0.9fr auto; gap: 8px; align-items: center;
+        background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+      }
+      .prow input { min-width: 0; }
+      .prow .pname { font-weight: 600; }
+      .prow .pscore { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; font-size: 15px; }
+      .prow-head { color: var(--muted); font-size: 12px; background: transparent; border: none; padding: 0 10px; }
+      .calc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 20px; }
+      .board { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+      .board th, .board td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+      .board th:first-child, .board td:first-child { text-align: left; }
+      .board .win { color: var(--accent); font-weight: 800; }
+      .muted-note { font-size: 13px; color: var(--muted); }
+      @media (max-width: 560px) {
+        .prow { grid-template-columns: 1fr 1fr 1fr; grid-auto-rows: auto; }
+        .prow .pname { grid-column: 1 / -1; }
+        .prow .pscore { grid-column: 1 / -1; text-align: left; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">♠ 보드플레이</a>
+      <nav>
+        <a href="/guide/">규칙</a>
+        <a class="btn" href="/">지금 플레이</a>
+      </nav>
+    </header>
+
+    <main>
+      <nav class="breadcrumb" aria-label="위치">
+        <a href="/">홈</a> › <a href="/guide/skullking/">스컬킹</a> › 점수 계산기
+      </nav>
+
+      <h1>스컬킹 점수 계산기</h1>
+      <p class="lede">
+        라운드마다 <strong>입찰</strong>과 <strong>실제로 딴 트릭 수</strong>를 넣으면 정확한 점수와 누적 순위를
+        자동으로 계산합니다. 종이에 적을 필요 없이 바로 쓰세요.
+      </p>
+
+      <section class="calc card">
+        <div class="calc-setup">
+          <div class="calc-field">
+            <label for="numPlayers">인원</label>
+            <select id="numPlayers"></select>
+          </div>
+          <div class="calc-field">
+            <label for="curRound">현재 라운드 (카드 수)</label>
+            <input id="curRound" type="number" min="1" max="10" value="1" />
+          </div>
+        </div>
+
+        <div class="players" id="players"></div>
+
+        <div class="calc-actions">
+          <button type="button" class="btn" id="addRound">이 라운드 기록 →</button>
+          <button type="button" class="btn" id="undo" style="background: var(--surface-2); color: var(--text)">마지막 라운드 취소</button>
+          <button type="button" class="btn" id="reset" style="background: var(--surface-2); color: var(--text)">전체 초기화</button>
+        </div>
+
+        <p class="muted-note">
+          보너스(입찰을 <strong>정확히 맞혔을 때만</strong> 적용): 색깔 14 +10, 검정 14 +20, 인어로 스컬킹 잡기 +50,
+          스컬킹으로 해적 잡기 +30. 보너스 칸에 합산 점수를 넣으세요.
+        </p>
+      </section>
+
+      <h2>누적 점수</h2>
+      <div class="table-wrap">
+        <table class="board" id="board">
+          <thead><tr id="boardHead"></tr></thead>
+          <tbody id="boardBody"></tbody>
+        </table>
+      </div>
+
+      <h2>점수 규칙 요약</h2>
+      <ul>
+        <li><strong>입찰 &gt; 0, 정확히 맞힘:</strong> 입찰 수 × 20점 (+보너스)</li>
+        <li><strong>입찰 &gt; 0, 빗나감:</strong> 빗나간 트릭 1개당 −10점</li>
+        <li><strong>입찰 = 0, 성공:</strong> 라운드(카드 수) × 10점</li>
+        <li><strong>입찰 = 0, 실패:</strong> 라운드(카드 수) × −10점</li>
+      </ul>
+      <p>자세한 규칙은 <a href="/guide/skullking/">스컬킹 규칙</a>, 이기는 법은 <a href="/guide/skullking/strategy/">스컬킹 전략</a>을 참고하세요.</p>
+
+      <div class="cta">
+        <h2>계산은 끝, 이제 한 판?</h2>
+        <p>설치 없이 브라우저에서 바로 스컬킹을 즐기세요.</p>
+        <a class="btn btn--lg" href="/">스컬킹 플레이하기</a>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/">홈</a> · <a href="/guide/skullking/">스컬킹 규칙</a> ·
+        <a href="/tools/tichu-score/">티츄 점수 계산기</a> · <a href="/privacy/">개인정보처리방침</a>
+      </p>
+      <p>스컬킹(Skull King)은 저작권자의 상표입니다. 본 사이트는 팬이 만든 비공식 플레이 도구입니다.</p>
+    </footer>
+
+    <script>
+      // 스컬킹 점수 로직 — 게임 서버(scoreRound)와 동일한 식.
+      function bidScore(bid, taken, cardCount) {
+        if (bid === 0) return taken === 0 ? 10 * cardCount : -10 * cardCount
+        if (bid === taken) return 20 * bid
+        return -10 * Math.abs(taken - bid)
+      }
+      function roundScore(bid, taken, cardCount, bonus) {
+        const met = bid === taken
+        return bidScore(bid, taken, cardCount) + (met ? bonus : 0)
+      }
+
+      var state = { players: [], history: [] } // history: [{round, entries:[{bid,taken,bonus,score}]}]
+
+      var $ = function (id) { return document.getElementById(id) }
+
+      function initPlayers(n) {
+        state.players = []
+        for (var i = 0; i < n; i++) state.players.push({ name: '플레이어 ' + (i + 1), total: 0 })
+        state.history = []
+        renderPlayers()
+        renderBoard()
+      }
+
+      function renderPlayers() {
+        var el = $('players')
+        el.innerHTML = ''
+        var head = document.createElement('div')
+        head.className = 'prow prow-head'
+        head.innerHTML = '<span>플레이어</span><span>입찰</span><span>획득</span><span>보너스</span><span></span>'
+        el.appendChild(head)
+        state.players.forEach(function (p, i) {
+          var row = document.createElement('div')
+          row.className = 'prow'
+          row.innerHTML =
+            '<input class="pname" type="text" value="' + p.name.replace(/"/g, '&quot;') + '" data-i="' + i + '" data-k="name" />' +
+            '<input type="number" min="0" max="10" value="0" data-i="' + i + '" data-k="bid" />' +
+            '<input type="number" min="0" max="10" value="0" data-i="' + i + '" data-k="taken" />' +
+            '<input type="number" value="0" step="10" data-i="' + i + '" data-k="bonus" />' +
+            '<span class="pscore">' + p.total + '점</span>'
+          el.appendChild(row)
+        })
+        el.querySelectorAll('input[data-k="name"]').forEach(function (inp) {
+          inp.addEventListener('input', function () { state.players[+inp.dataset.i].name = inp.value || ('플레이어 ' + (+inp.dataset.i + 1)); renderBoard() })
+        })
+      }
+
+      function readEntries() {
+        var rows = $('players').querySelectorAll('.prow:not(.prow-head)')
+        return Array.prototype.map.call(rows, function (row) {
+          var num = function (k) { return parseInt(row.querySelector('input[data-k="' + k + '"]').value, 10) || 0 }
+          return { bid: num('bid'), taken: num('taken'), bonus: num('bonus') }
+        })
+      }
+
+      function addRound() {
+        var cardCount = parseInt($('curRound').value, 10) || 1
+        var entries = readEntries().map(function (e) {
+          return { bid: e.bid, taken: e.taken, bonus: e.bonus, score: roundScore(e.bid, e.taken, cardCount, e.bonus) }
+        })
+        entries.forEach(function (e, i) { state.players[i].total += e.score })
+        state.history.push({ round: cardCount, entries: entries })
+        // 다음 라운드로
+        var next = Math.min(10, cardCount + 1)
+        $('curRound').value = next
+        // 입찰/획득/보너스 리셋
+        $('players').querySelectorAll('input[data-k="bid"],input[data-k="taken"],input[data-k="bonus"]').forEach(function (inp) { inp.value = 0 })
+        renderPlayers()
+        renderBoard()
+      }
+
+      function undo() {
+        var last = state.history.pop()
+        if (!last) return
+        last.entries.forEach(function (e, i) { if (state.players[i]) state.players[i].total -= e.score })
+        renderPlayers()
+        renderBoard()
+      }
+
+      function renderBoard() {
+        var head = $('boardHead')
+        var body = $('boardBody')
+        head.innerHTML = '<th>라운드</th>' + state.players.map(function (p) { return '<th>' + escapeHtml(p.name) + '</th>' }).join('')
+        var rowsHtml = state.history.map(function (h) {
+          return '<tr><td>' + h.round + '라운드</td>' + h.entries.map(function (e) {
+            return '<td>' + (e.score >= 0 ? '+' : '') + e.score + '</td>'
+          }).join('') + '</tr>'
+        }).join('')
+        // 합계
+        var best = state.players.length ? Math.max.apply(null, state.players.map(function (p) { return p.total })) : 0
+        var totalRow = '<tr><td><strong>합계</strong></td>' + state.players.map(function (p) {
+          return '<td class="' + (state.history.length && p.total === best ? 'win' : '') + '"><strong>' + p.total + '</strong></td>'
+        }).join('') + '</tr>'
+        body.innerHTML = rowsHtml + totalRow
+      }
+
+      function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] }) }
+
+      // 인원 셀렉트 채우기
+      var sel = $('numPlayers')
+      for (var n = 2; n <= 6; n++) { var o = document.createElement('option'); o.value = n; o.textContent = n + '명'; sel.appendChild(o) }
+      sel.value = 4
+      sel.addEventListener('change', function () { initPlayers(parseInt(sel.value, 10)) })
+      $('addRound').addEventListener('click', addRound)
+      $('undo').addEventListener('click', undo)
+      $('reset').addEventListener('click', function () { $('curRound').value = 1; initPlayers(parseInt(sel.value, 10)) })
+
+      initPlayers(4)
+    </script>
+  </body>
+</html>

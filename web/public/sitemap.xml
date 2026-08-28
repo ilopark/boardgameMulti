@@ -31,6 +31,16 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://boardplay.dpdns.org/tools/tichu-score/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://boardplay.dpdns.org/tools/skullking-score/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://boardplay.dpdns.org/about/</loc>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>

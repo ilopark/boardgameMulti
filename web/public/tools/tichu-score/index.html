@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>티츄 점수 계산기 — 카드점수·티츄 선언·원투 자동 계산 | 보드플레이</title>
+    <meta
+      name="description"
+      content="티츄 점수를 자동으로 계산해주는 무료 계산기. 팀별 카드 점수와 티츄·그랜드티츄 선언, 원투를 넣으면 라운드 점수와 목표까지 누적을 바로 보여줍니다."
+    />
+    <meta name="keywords" content="티츄 점수 계산기, 티츄 점수, 티츄 계산기, 티츄 점수 계산, 원투, tichu score" />
+    <link rel="canonical" href="https://boardplay.dpdns.org/tools/tichu-score/" />
+    <meta name="theme-color" content="#f4f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#07090f" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="보드플레이" />
+    <meta property="og:title" content="티츄 점수 계산기" />
+    <meta property="og:description" content="카드점수·선언·원투를 넣으면 티츄 점수를 자동 계산." />
+    <meta property="og:url" content="https://boardplay.dpdns.org/tools/tichu-score/" />
+    <meta property="og:image" content="https://boardplay.dpdns.org/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="stylesheet" href="/guide/guide.css" />
+    <script src="/analytics.js" defer></script>
+    <style>
+      .calc input[type='number'], .calc input[type='text'], .calc select {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+        padding: 9px 11px; color: var(--text); font: inherit; font-size: 15px; width: 100%;
+      }
+      .calc input:focus, .calc select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+      .team { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+      .team h3 { margin: 0; font-size: 15px; }
+      .field-row { display: flex; flex-direction: column; gap: 4px; }
+      .field-row label { font-size: 12px; color: var(--muted); }
+      .oneTwo { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; }
+      .calc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 20px; }
+      .board { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+      .board th, .board td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+      .board th:first-child, .board td:first-child { text-align: left; }
+      .board .win { color: var(--accent); font-weight: 800; }
+      .muted-note { font-size: 13px; color: var(--muted); }
+      .cardpts { display: flex; gap: 10px; align-items: flex-end; }
+      @media (max-width: 560px) { .teams { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">♠ 보드플레이</a>
+      <nav>
+        <a href="/guide/">규칙</a>
+        <a class="btn" href="/">지금 플레이</a>
+      </nav>
+    </header>
+
+    <main>
+      <nav class="breadcrumb" aria-label="위치">
+        <a href="/">홈</a> › <a href="/guide/tichu/">티츄</a> › 점수 계산기
+      </nav>
+
+      <h1>티츄 점수 계산기</h1>
+      <p class="lede">
+        팀별 <strong>카드 점수</strong>(합 100)와 <strong>티츄·그랜드티츄 선언</strong>, <strong>원투</strong>를 넣으면
+        라운드 점수와 목표까지의 누적을 자동으로 계산합니다.
+      </p>
+
+      <section class="calc card">
+        <div class="cardpts">
+          <div class="field-row" style="flex:1">
+            <label for="target">목표 점수</label>
+            <input id="target" type="number" min="100" step="100" value="1000" />
+          </div>
+        </div>
+
+        <label class="oneTwo">
+          <input type="checkbox" id="oneTwo" />
+          <span>원투(한 팀이 1·2등) — 체크하면 그 팀 +200, 카드 점수 무시</span>
+        </label>
+
+        <div class="teams" id="teams"></div>
+
+        <div class="calc-actions">
+          <button type="button" class="btn" id="addRound">이 라운드 기록 →</button>
+          <button type="button" class="btn" id="undo" style="background: var(--surface-2); color: var(--text)">마지막 라운드 취소</button>
+          <button type="button" class="btn" id="reset" style="background: var(--surface-2); color: var(--text)">전체 초기화</button>
+        </div>
+
+        <p class="muted-note">
+          카드 점수 합은 100입니다(K·10 = 10점, 5 = 5점, 용 +25, 봉황 −25). 한 팀 값을 넣으면 상대 팀은 자동으로 채워집니다.
+          선언은 그 사람이 <strong>1등으로 마쳤는지</strong>로 성공/실패를 고르세요.
+        </p>
+      </section>
+
+      <h2>누적 점수</h2>
+      <div class="table-wrap">
+        <table class="board" id="board">
+          <thead><tr id="boardHead"></tr></thead>
+          <tbody id="boardBody"></tbody>
+        </table>
+      </div>
+      <p id="winMsg" class="callout" style="display:none"></p>
+
+      <h2>점수 규칙 요약</h2>
+      <ul>
+        <li><strong>카드 점수:</strong> 두 팀이 트릭으로 나눠 가진 점수(합 100).</li>
+        <li><strong>원투:</strong> 한 팀이 1·2등을 모두 하면 그 팀 +200, 카드 점수 계산 안 함.</li>
+        <li><strong>티츄 선언:</strong> 성공 ±100, <strong>그랜드 티츄:</strong> 성공 ±200 (선언자가 1등으로 마치면 성공).</li>
+      </ul>
+      <p>자세한 규칙은 <a href="/guide/tichu/">티츄 규칙</a>, 이기는 법은 <a href="/guide/tichu/strategy/">티츄 전략</a>을 참고하세요.</p>
+
+      <div class="cta">
+        <h2>계산은 끝, 이제 한 판?</h2>
+        <p>설치 없이 브라우저에서 바로 티츄를 즐기세요.</p>
+        <a class="btn btn--lg" href="/">티츄 플레이하기</a>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        <a href="/">홈</a> · <a href="/guide/tichu/">티츄 규칙</a> ·
+        <a href="/tools/skullking-score/">스컬킹 점수 계산기</a> · <a href="/privacy/">개인정보처리방침</a>
+      </p>
+      <p>티츄(Tichu)는 저작권자의 상표입니다. 본 사이트는 팬이 만든 비공식 플레이 도구입니다.</p>
+    </footer>
+
+    <script>
+      var $ = function (id) { return document.getElementById(id) }
+      var DECL = [
+        { v: 'none', t: '선언 없음', pts: 0 },
+        { v: 'tichu_ok', t: '티츄 성공 +100', pts: 100 },
+        { v: 'tichu_no', t: '티츄 실패 −100', pts: -100 },
+        { v: 'grand_ok', t: '그랜드 성공 +200', pts: 200 },
+        { v: 'grand_no', t: '그랜드 실패 −200', pts: -200 },
+      ]
+      var state = { totals: [0, 0], history: [] } // history: [{a, b}]
+
+      function declSelect(id) {
+        return '<select id="' + id + '">' + DECL.map(function (d) { return '<option value="' + d.v + '">' + d.t + '</option>' }).join('') + '</select>'
+      }
+
+      function renderTeams() {
+        $('teams').innerHTML =
+          '<div class="team">' +
+          '<h3>팀 A <span class="muted-note">(1·3번)</span></h3>' +
+          '<div class="field-row"><label>카드 점수 (0~100)</label><input id="cardA" type="number" min="0" max="100" value="50" /></div>' +
+          '<div class="field-row"><label>선언 · 플레이어 1</label>' + declSelect('a1') + '</div>' +
+          '<div class="field-row"><label>선언 · 플레이어 3</label>' + declSelect('a2') + '</div>' +
+          '</div>' +
+          '<div class="team">' +
+          '<h3>팀 B <span class="muted-note">(2·4번)</span></h3>' +
+          '<div class="field-row"><label>카드 점수 (자동)</label><input id="cardB" type="number" min="0" max="100" value="50" /></div>' +
+          '<div class="field-row"><label>선언 · 플레이어 2</label>' + declSelect('b1') + '</div>' +
+          '<div class="field-row"><label>선언 · 플레이어 4</label>' + declSelect('b2') + '</div>' +
+          '</div>'
+        // 카드점수 자동 보완
+        $('cardA').addEventListener('input', function () {
+          var a = clamp(parseInt($('cardA').value, 10) || 0, 0, 100)
+          $('cardB').value = 100 - a
+        })
+        $('cardB').addEventListener('input', function () {
+          var b = clamp(parseInt($('cardB').value, 10) || 0, 0, 100)
+          $('cardA').value = 100 - b
+        })
+        $('oneTwo').addEventListener('change', function () {
+          var on = $('oneTwo').checked
+          $('cardA').disabled = on; $('cardB').disabled = on
+        })
+      }
+
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+      function declPts(id) { var v = $(id).value; var d = DECL.filter(function (x) { return x.v === v })[0]; return d ? d.pts : 0 }
+
+      function addRound() {
+        var a, b
+        if ($('oneTwo').checked) {
+          // 원투: 카드점수 무시. 어느 팀이 1·2등인지는 카드점수 큰 쪽으로 잡기 애매 → 선언/카드 대신 별도 처리:
+          // 간단히: 카드A가 비활성이므로, 원투 팀을 "카드 점수 입력이 더 큰 쪽"이 아니라 명시적으로 물어보는 대신
+          // 두 팀 중 선언 점수까지 합쳐 큰 쪽에 200을 준다는 건 부정확 → 사용자가 원투 팀을 카드A>0로 표시하게 안내.
+          // 여기서는 원투 시 팀A에 200을 주는 것을 기본으로 하고, 팀 전환은 아래 프롬프트로.
+          var who = window.prompt('원투한 팀을 입력하세요: A 또는 B', 'A')
+          if (who === null) return
+          who = who.trim().toUpperCase() === 'B' ? 1 : 0
+          a = who === 0 ? 200 : 0
+          b = who === 1 ? 200 : 0
+        } else {
+          a = clamp(parseInt($('cardA').value, 10) || 0, 0, 100)
+          b = 100 - a
+        }
+        a += declPts('a1') + declPts('a2')
+        b += declPts('b1') + declPts('b2')
+        state.totals[0] += a; state.totals[1] += b
+        state.history.push({ a: a, b: b })
+        // 초기화
+        ;['a1', 'a2', 'b1', 'b2'].forEach(function (id) { $(id).value = 'none' })
+        $('oneTwo').checked = false; $('cardA').disabled = false; $('cardB').disabled = false
+        $('cardA').value = 50; $('cardB').value = 50
+        renderBoard()
+      }
+
+      function undo() {
+        var last = state.history.pop()
+        if (!last) return
+        state.totals[0] -= last.a; state.totals[1] -= last.b
+        renderBoard()
+      }
+
+      function renderBoard() {
+        $('boardHead').innerHTML = '<th>라운드</th><th>팀 A</th><th>팀 B</th>'
+        var rows = state.history.map(function (h, i) {
+          return '<tr><td>' + (i + 1) + '라운드</td><td>' + sign(h.a) + '</td><td>' + sign(h.b) + '</td></tr>'
+        }).join('')
+        var target = parseInt($('target').value, 10) || 1000
+        var winA = state.totals[0] >= target && state.totals[0] >= state.totals[1]
+        var winB = state.totals[1] >= target && state.totals[1] > state.totals[0]
+        var totalRow = '<tr><td><strong>합계</strong></td>' +
+          '<td class="' + (winA ? 'win' : '') + '"><strong>' + state.totals[0] + '</strong></td>' +
+          '<td class="' + (winB ? 'win' : '') + '"><strong>' + state.totals[1] + '</strong></td></tr>'
+        $('boardBody').innerHTML = rows + totalRow
+        var msg = $('winMsg')
+        if (winA || winB) { msg.style.display = 'block'; msg.textContent = '🏆 팀 ' + (winA ? 'A' : 'B') + ' 승리! (목표 ' + target + '점 도달)' }
+        else { msg.style.display = 'none' }
+      }
+      function sign(n) { return (n >= 0 ? '+' : '') + n }
+
+      renderTeams()
+      $('addRound').addEventListener('click', addRound)
+      $('undo').addEventListener('click', undo)
+      $('reset').addEventListener('click', function () { state = { totals: [0, 0], history: [] }; renderTeams(); renderBoard() })
+      $('target').addEventListener('input', renderBoard)
+      renderBoard()
+    </script>
+  </body>
+</html>

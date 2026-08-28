@@ -120,14 +120,16 @@ export default function AuthPanel({ auth, onGuest, onError, invitedCode }: Props
             친구를 초대하거나 봇과 함께 티츄·스컬킹 한 판 하세요.
           </p>
           <div className="authland__games">
-            <a className="authland__game" href="/guide/tichu/">
+            <div className="authland__game">
               <b>티츄</b>
-              <span>규칙 보기 →</span>
-            </a>
-            <a className="authland__game" href="/guide/skullking/">
+              <a href="/guide/tichu/">규칙 보기</a>
+              <a href="/tools/tichu-score/">점수 계산기</a>
+            </div>
+            <div className="authland__game">
               <b>스컬킹</b>
-              <span>규칙 보기 →</span>
-            </a>
+              <a href="/guide/skullking/">규칙 보기</a>
+              <a href="/tools/skullking-score/">점수 계산기</a>
+            </div>
           </div>
         </section>
       )}
