@@ -1593,6 +1593,9 @@ textarea:focus {
   line-height: 1.7;
   color: var(--text);
   text-align: center;
+  /* 한글이 단어 중간에서 끊겨 '요.' 만 다음 줄로 넘어가는 걸 막는다 (띄어쓰기 단위로만 줄바꿈) */
+  word-break: keep-all;
+  text-wrap: pretty;
 }
 .authland__intro b { color: var(--accent); }
 .authland__games {
